@@ -1,0 +1,247 @@
+# active aliases
+
+<!-- pandoc: html-N -->
+<!-- pandoc: toc -->
+
+This is documentation for "active aliases", a small tool I wrote a couple
+months ago. The program itself is called `__` (yes, that's two underscores),
+but as you will see, I rarely even type that.
+
+Briefly, `__` is a way to transform user-typed commands into something else
+and execute the resulting command.  Be sure to read at least upto the examples
+section below if you want to understand it.
+
+## motivation
+
+zsh lets you say, for example, `alias -g .='$(task _ids | tail -1)'`.  This
+allows me to type `task . <commands>` and it would substitute the period with
+the id of the latest task added.
+
+While this is cool and all, that's a **global** alias, meaning it'll do that
+for any command in which I use `.` as an argument.  Imagine `cp /tmp/foo/* .`
+or something!  I need a way to restrict that specific expansion to only the
+task command.
+
+I also do not want to depend on zsh being available everywhere I work.
+
+## BASIC PRINCIPLE
+
+*   a user types a command in such a way that `__` is invoked (see
+    "invocation" section later for details).
+
+*   the `__` command reads its config lines, one by one.
+
+*   each config line has a "template" field and a "replacement" field.  The
+    command is matched against the template.
+
+*   if it matches, the "replacement" becomes the new command.  Otherwise that
+    config line is skipped
+
+*   in either case, processing continues with the next config line.  **This
+    means a command can be changed multiple times**, if the output of one
+    transformation matches the template of a subsequent line.
+
+*   this repeats until all lines in the config are done. See examples 1 and 4
+    below.
+
+When all lines have bene processed, whatever command is the result is
+executed.
+
+## examples
+
+Note that the config lines in the examples are correct except for not showing
+the hard tabs between the 3 fields that the syntax requires.
+
+Also note that some of these examples may make more sense if you're already
+familiar with those systems (taskwarrior, git, etc.), but even if you don't,
+it should not be too bad.
+
+1.  The first example is already up there: `tw .` becomes `task 92 info`
+    assuming 92 is the last task id created for example.
+
+    Say what?  Where's that `info` come from?
+
+    Well there's also an "active alias" that says "if the command 'task' is
+    run with exactly one argument and that is a number, then append 'info' to
+    the command before you run it".
+
+    Cool huh?
+
+    Config lines:
+
+        tw      tw \.           tw `task _ids | tail -1`
+        tw      tw (\d+)$       task %1 info
+
+    **You'll notice right away that these aliases chain.  So the sequence
+    matters here!**  In this example, `tw .` first becomes, say, `tw 92` based
+    on the first rule, then `tw 92` becomes `tw 92 info` based on the second
+    rule.
+
+2.  To save column space, I print the short UUID on some reports.  I then want
+    to do stuff to that entry, using that UUID.  Sadly, taskwarrior insists on
+    the long uuid, which I don't have.
+
+    But I can get *all* the UUIDs from `task _uuids` and grep for my short
+    one.  (There won't be any duplicates, I am confident).
+
+    So... `tw $SHORT_UUID` just expands the short UUID into the long one
+    (internally) and runs the command!
+
+    Config lines:
+
+        tw      tw ([0-9a-f]{8})$               task `task _uuids | grep %1` info
+        tw      tw ([0-9a-f]{8}) %%             tw `task _uuids | grep %1` %2
+
+3.  I often want to change both the due date **and** the wait date to the same
+    value.  (The wait date in taskwarrior is the date after which the task
+    will show up as "pending"; before that you won't even see it on "pending"
+    reports).
+
+    Nothing in task or in zsh's alias mechanism allows this.  You can do
+    something really complicated by creating a task alias (that's inside
+    `~/.taskrc`, not `~/.zshrc` or such) that defines a function and then
+    calls the function all in one go, but it's hard on eyes.  Even for a perl
+    programmer ;-)
+
+    So just say `task mod 92 ::2weeks` (for example).  The double colon is
+    expanded by this config line:
+
+        tw      tw %% ::%       task %1 due:%2 wait:%2
+
+    Problem solved.
+
+4.  Sometimes you do something in a directory and it creates a file.  You want
+    to do stuff with this file.  And it often has (or may have) an odd name
+    and you have to at least remember the first few characters to tab-complete
+    it.
+
+    So here:
+
+        youtube-dl <some URL>
+        __ vlc LF
+
+    and off it goes!
+
+    I'm sure zsh has some way to do this, but remember I need it in places I
+    don't have zsh and can't (be bothered to) install it.
+
+    Even better, this picks up the 3rd most recently updated file:
+
+        __ some-command LF3
+
+    and so on for any single digit.  The config lines are:
+
+        ALL     %% LF           %1 ./LF1
+        ALL     %% LF(\d)       %1 ./LF%2
+        ALL     %% (\D\S*)/LF   %1 %2/LF1
+        ALL     %% %/LF(\d)     %1 %2/`cd %2 ;ls -Atrc|tail -%3|head -1`
+
+    This is another example of alias lines chaining.  What's happening is that
+    each rule gets the command closer to some canonical form, and the last
+    rule works only on the canonical form.
+
+    (Similarly, I have BN as an alias for the basename of the current
+    directory).
+
+5.  I often create directories with today's date, in either YYYY-MM or
+    YYYY-MM-DD form.  The folders are *never* called just "2013-03", but
+    rather, "2013-03-RSP-review" or some such thing.
+
+    What I would like to do is simply `mkdir Ym-RSP-review`.  Zsh's global
+    aliases won't work on this -- they treat that whole thing as one token and
+    it doesn't match any alias.
+
+    But with these config lines:
+
+        ALL     %% Ym-%         %1 `date +%Y-%m-`%2
+        ALL     %% Ymd-%        %1 `date +%Y-%m-%d-`%2
+
+    it's trivial.
+
+    You might argue that this would prevent me from actually having a file
+    whose name starts with "Ym-" or "Ymd-".  That is correct.  I'm fine with
+    that, but if you're not, you could always establish a leader character
+    (I suggest the comma) before the "Y".  Surely you won't be needing an
+    actual file called `,Ym-foo` right?
+
+That's about it.
+
+## invocation
+
+You can invoke `__` in 3 ways:
+
+1.  for commands that you use frequently, setup aliases like this:
+
+        alias foo='__ foo'
+
+    Don't worry; this won't recurse forever, assuming foo is originally an
+    executable program of some kind (i.e., not a shell builtin, shell
+    function, or alias)
+
+2.  for commands that you use rarely, run it explicitly if you want "active
+    alias" support.  For example, this will run vlc on the last updated file
+    in the current directory.  (See example 4 below for details).
+
+        __ vlc LF
+
+3.  use the "unknown command helper" feature of bash or zsh.  This helps you
+    create new aliases for existing commands by adding them directly into the
+    config lines for the `__` program.
+
+    See examples 1, 2, and 3 below, which show that I use "tw" for "task".
+    There is actually no command, alias, or function called "tw" on the
+    system, but the "unknown command helper" function detects that and does
+    some magic. See appendix 1 for the code for this function.
+
+    It's worth repeating that this makes it possible to use pretty much
+    **anything** as an implicit alias simply by putting it in this file.
+    However, should a real command of that name ever get installed by some
+    means, you may have a bit of a confusing time until you realise what
+    happened.  At that point, the best thing is to go to method 1.
+
+## config syntax
+
+**NOTE**: at present the config is hardcoded in the bottom of the source
+itself.  If anyone other than me actually starts using it, contact me
+(sitaramc@gmail.com) and I will separate it out!
+
+Each line has the following fields, with a hard tab (actual tab character, not
+just spaces) between them: command, from, to, condition.
+
+1.  The "command" is used to match the first word of the user-supplied
+    command. If it doesn't match, that config line is skipped.
+
+    You could consider this a first level pattern match.
+
+2.  The "from" is a pattern that the current command is matched against.  If
+    it doesn't match, the config line is skipped.
+
+    This variable is considered to be a perl regex, and is matched against the
+    user supplied command.
+
+3.  The "to" is the new command.  Variables like %1 and %2 etc are replaced by
+    the corresponding matched subgroups in the regex match in the previous
+    step.
+
+4.  The "cond" is some extra code that is evaluated in perl.  If it exists, it
+    must return true, otherwise the config line is skipped.
+
+## installation
+
+Just put it in your path somewhere.
+
+## appendix 1 -- unknown command helper code
+
+Here's the code.  Note that on bash the function should be called
+`command_not_found_handle` (yes -- one letter at the end dropped!)
+
+    command_not_found_handler() {
+        if grep >/dev/null "^$1	" `which __`
+        then
+            __ "$@"
+            exit $?
+        fi
+        unset -f command_not_found_handler      # XXX do we need this?
+        exec $SHELL -c "$@"
+            # punt to shell.  Note that this is one SHLVL down in zsh
+    }
