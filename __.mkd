@@ -8,8 +8,12 @@ months ago. The program itself is called `__` (yes, that's two underscores),
 but as you will see, I rarely even type that.
 
 Briefly, `__` is a way to transform user-typed commands into something else
-and execute the resulting command.  Be sure to read at least upto the examples
-section below if you want to understand it.
+and execute the resulting command.  The program reads a series of pattern +
+replacement pairs, and if the pattern matches, the replacement becomes the
+current command.  The end result after all the pattern + replacement lines are
+done is what gets executed.
+
+Be sure to read at least upto the examples section below if that isn't clear.
 
 ## motivation
 
@@ -24,32 +28,36 @@ task command.
 
 I also do not want to depend on zsh being available everywhere I work.
 
-## BASIC PRINCIPLE
+Finally, this seems like a cheap way to get directory-specific aliases (i.e.,
+aliases that are valid only when I am in a certain directory or its
+subdirectories).
+
+## basic principle
 
 *   a user types a command in such a way that `__` is invoked (see
     "invocation" section later for details).
 
-*   the `__` command reads its config lines, one by one.
+*   the `__` command reads its rc lines, one by one.
 
-*   each config line has a "template" field and a "replacement" field.  The
+*   each rc line has a "template" field and a "replacement" field.  The
     command is matched against the template.
 
 *   if it matches, the "replacement" becomes the new command.  Otherwise that
-    config line is skipped
+    rc line is skipped
 
-*   in either case, processing continues with the next config line.  **This
+*   in either case, processing continues with the next rc line.  **This
     means a command can be changed multiple times**, if the output of one
     transformation matches the template of a subsequent line.
 
-*   this repeats until all lines in the config are done. See examples 1 and 4
+*   this repeats until all lines in the rc are done. See examples 1 and 4
     below.
 
-When all lines have bene processed, whatever command is the result is
+When all lines have been processed, whatever command is the result is
 executed.
 
 ## examples
 
-Note that the config lines in the examples are correct except for not showing
+Note that the rc lines in the examples are correct except for not showing
 the hard tabs between the 3 fields that the syntax requires.
 
 Also note that some of these examples may make more sense if you're already
@@ -67,7 +75,7 @@ it should not be too bad.
 
     Cool huh?
 
-    Config lines:
+    rc lines:
 
         tw      tw \.           tw `task _ids | tail -1`
         tw      tw (\d+)$       task %1 info
@@ -87,7 +95,7 @@ it should not be too bad.
     So... `tw $SHORT_UUID` just expands the short UUID into the long one
     (internally) and runs the command!
 
-    Config lines:
+    rc lines:
 
         tw      tw ([0-9a-f]{8})$               task `task _uuids | grep %1` info
         tw      tw ([0-9a-f]{8}) %%             tw `task _uuids | grep %1` %2
@@ -104,7 +112,7 @@ it should not be too bad.
     programmer ;-)
 
     So just say `task mod 92 ::2weeks` (for example).  The double colon is
-    expanded by this config line:
+    expanded by this rc line:
 
         tw      tw %% ::%       task %1 due:%2 wait:%2
 
@@ -129,7 +137,7 @@ it should not be too bad.
 
         __ some-command LF3
 
-    and so on for any single digit.  The config lines are:
+    and so on for any single digit.  The rc lines are:
 
         ALL     %% LF           %1 ./LF1
         ALL     %% LF(\d)       %1 ./LF%2
@@ -151,7 +159,7 @@ it should not be too bad.
     aliases won't work on this -- they treat that whole thing as one token and
     it doesn't match any alias.
 
-    But with these config lines:
+    But with these rc lines:
 
         ALL     %% Ym-%         %1 `date +%Y-%m-`%2
         ALL     %% Ymd-%        %1 `date +%Y-%m-%d-`%2
@@ -185,8 +193,8 @@ You can invoke `__` in 3 ways:
         __ vlc LF
 
 3.  use the "unknown command helper" feature of bash or zsh.  This helps you
-    create new aliases for existing commands by adding them directly into the
-    config lines for the `__` program.
+    create new aliases by adding them directly into the rc lines for the
+    `__` program.
 
     See examples 1, 2, and 3 below, which show that I use "tw" for "task".
     There is actually no command, alias, or function called "tw" on the
@@ -199,22 +207,33 @@ You can invoke `__` in 3 ways:
     means, you may have a bit of a confusing time until you realise what
     happened.  At that point, the best thing is to go to method 1.
 
-## config syntax
+## rc files
 
-**NOTE**: at present the config is hardcoded in the bottom of the source
-itself.  If anyone other than me actually starts using it, contact me
-(sitaramc@gmail.com) and I will separate it out!
+The program picks up rc files in the following order.  The combined content of
+all of them is what is used:
+
+1.  `.__rc` from the same directory (typically something in the PATH) where
+    `__` itself is installed.
+2.  `.__rc` in the current directory, if it exists.
+3.  `.__rc` in its parent directory, if it exists, and so on for each
+    successive parent directory, all the way upto \$HOME.
+
+NOTE: If your current directory is not \$HOME (say your PWD is /tmp or
+something), then this will behave as if you were in \$HOME (i.e., it will never
+look for rc files outside your home directory tree).
+
+## rc syntax
 
 Each line has the following fields, with a hard tab (actual tab character, not
 just spaces) between them: command, from, to, condition.
 
 1.  The "command" is used to match the first word of the user-supplied
-    command. If it doesn't match, that config line is skipped.
+    command. If it doesn't match, that rc line is skipped.
 
     You could consider this a first level pattern match.
 
 2.  The "from" is a pattern that the current command is matched against.  If
-    it doesn't match, the config line is skipped.
+    it doesn't match, the rc line is skipped.
 
     This variable is considered to be a perl regex, and is matched against the
     user supplied command.
@@ -224,7 +243,7 @@ just spaces) between them: command, from, to, condition.
     step.
 
 4.  The "cond" is some extra code that is evaluated in perl.  If it exists, it
-    must return true, otherwise the config line is skipped.
+    must return true, otherwise the rc line is skipped.
 
 ## installation
 

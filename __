@@ -6,6 +6,10 @@ use 5.10.0;
 # active aliases -- see http://gitolite.com/active-aliases (or __.mkd in the
 # source repo) for documentation
 
+# the idea of applying a series of transformations to a command based on
+# matching a list of patterns is not new.  If you don't know where I got it
+# from, you're not old enough ;-)
+
 # NOTE: at present the "config" for this is right here in this file.  If
 # anyone other than me actually starts using it, it may be worth moving into a
 # separate file so the code can be updated cleanly.
@@ -17,8 +21,19 @@ use URI::Escape;
 my $fullcmd = join( " ", map { esc($_) } @ARGV );
 my $cmd_name = shift;
 
+# now we need to get the pattern+replacement list, which comes from the
+# following sources, in sequence:
+#       dirname($0)/.__rc   # shipped rc file
+#       $PWD/.__rc
+#       $PWD/../.__rc       # that is, .__rc in the parent of $PWD
+#       ...and so on...     # all the way upto $HOME
+# Note: if $PWD is not within $HOME, we behave as if we were in $HOME (i.e.,
+# only the shipped rc file and the one in $HOME are used).
+
+@ARGV = get_rc_filenames();
+
 # TODO: this needs to go into its own config file eventually
-while (<DATA>) {
+while (<>) {
     chomp; next unless /\S/; next if /^\s*#/;
 
     my ( $cmd, $pattern, $repl, $cond ) = split /\t/;
@@ -73,7 +88,8 @@ while (<DATA>) {
 # quoted so the shell is happy.
 $fullcmd = join " ", map { quote_unesc($_) } split ' ', $fullcmd;
 say STDERR "+$fullcmd";
-exec("$fullcmd") or die "exec '$fullcmd' failed: $!";
+no warnings;
+exec("$fullcmd") or die "__: $cmd_name: command not found\n";
 
 # ----------------------------------------------------------------------
 
@@ -107,112 +123,27 @@ sub quote_unesc {
 
 # ----------------------------------------------------------------------
 
-### other ideas from http://grml.org/zsh/zsh-lovers.html
-###
-### alias -g CA='|& cat -A'
-###     ... similarly for less, egrep, and variants ...
-### alias -g NUL="> /dev/null 2>&1"
-### alias -g NE="2> /dev/null"
-###     ... etc ...
-###
-### but maybe we'll be happier with prefix form:
-###     CA <command>
-### or at least
-###     NO <command>
-###     NE <command>
-###     NOE <command>
-### other examples
-###     TL
-###     T20
-###     LS
+sub get_rc_filenames {
+    use Cwd;
+    my $bd = $1 if $0 =~ m((.*)/);
+    my $home = $ENV{HOME};
+    my $cur = getcwd;
 
-# syntax
-# aliasname <TAB> pattern <TAB> replacement
-# %% in pattern is (.+); % is (\S+)
-# %<digits> in repl is corresponding paren
-# rules are matched in sequence
+    # if we're not starting from a subdir of $home, we pretend we're in $home
+    # for the purposes of finding rc files
+    $cur = $home if index($cur, $home);
 
-__DATA__
-# ---------- ALL ----------
-# 'c' field eq 'ALL' means apply this transform to ANY incoming command
+    my @ret = ("$bd/.__rc");    # shipped rc file
+    while (1) {
+        push @ret, "$cur/.__rc" if -f "$cur/.__rc";
+        last if $cur eq $home;
+        $cur =~ s(/[^/]+$)();
+    }
 
-ALL	%% LF	%1 ./LF1
-ALL	%% LF(\d)	%1 ./LF%2
-ALL	%% (\D\S*)/LF	%1 %2/LF1
-ALL	%% %/LF(\d)	%1 %2/`cd %2 ;ls -Atrc|tail -%3|head -1`	print STDERR "+%2/" . `cd %2 ;ls -Atrc|tail -%3|head -1`
+    if ($ENV{D}) {
+        require Data::Dumper;
+        say Data::Dumper::Dumper(\@ret);
+    }
 
-ALL	%% Ym-%	%1 `date +%Y-%m-`%2
-ALL	%% Ymd-%	%1 `date +%Y-%m-%d-`%2
-
-ALL	%% %/BN	%1 %2/`basename $PWD`
-
-# ---------- 'dm' (daemonise) ----------
-dm	dm %	xdg-open %1 >/dev/null 2>&1	-f "%1" and not -x "%1"
-dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
-dm	dm %%	( ( nice %1 >/dev/null 2>&1 ) & )
-
-# ---------- task ----------
-tw	tw help$	perl -ne 'next unless /##/; print "\t" unless /^##/; print' ~/.taskrc
-tw	tw \.	tw `task _ids | tail -1`
-tw	tw (\d+)$	task %1 info
-tw	tw %% (\d+)$	task %1 limit:%2
-tw	tw ([0-9a-f]{8})$	task `task _uuids | grep %1` info
-tw	tw ([0-9a-f]{8}) %%	tw `task _uuids | grep %1` %2
-tw	tw %% ::%	task %1 due:%2 wait:%2
-tw	tw	task
-
-# ---------- ew ----------
-# this one makes it hard to grep for single digits; oh well...
-ew	ew ([1-9])	ew -n -%1
-ew	ew ([lnv])	ew -%1
-
-# ---------- vim ----------
-# which
-vw	vw %%	vim `which %1`
-# path
-vp	vp % %	sf %1 -f -r %2 -e vim
-vp	vp %	sf -f -r %1 -e vim
-# file
-vf	vf % %	sf %1 -f %2 -e vim
-vf	vf %	sf -f %1 -e vim
-# line
-vl	vl i w %%	vl -i -w %1
-vl	vl iw %%	vl -i -w %1
-vl	vl w i %%	vl -i -w %1
-vl	vl wi %%	vl -i -w %1
-vl	vl i %%	vl -i %1
-vl	vl w %%	vl -w %1
-vl	vl %%	vim -c 'Grep %1'
-
-# ---------- chmod ----------
-ch	ch r	chmod -R go+rX
-ch	ch w	chmod u+w
-ch	ch x	chmod +x
-
-# ---------- ltrc|ew|tail ----------
-# 2 args; note that we don't cater to N > 9 here
-lf	lf (\d) %	lf %2 %1
-lf	lf % (\d)$	lf %1 . -%2	-d "%1"
-lf	lf % (\d)$	lf . %1 -%2
-lf	lf % %$	lf %2 %1 -10	not -d "%1"
-lf	lf % %$	lf %1 %2 -10
-# 1 arg
-lf	lf %$	lf %1 . -10	-d "%1"
-lf	lf %$	lf . %1 -10
-# no args
-lf	lf$	lf . . -10
-# canonical form 1
-lf	lf % \. -%	ls -Altrc "%1" | tail -%2
-# canonical form 2
-lf	lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
-
-# ---------- tig ----------
-ts	ts	tg s
-tg	tg b	tg --boundary
-tg	tg s	tg status
-tg	tg	tg CDRR
-tg	tg CDRR	cd `git rev-parse --show-toplevel` ; tig
-
-save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
-
-# vim: ts=16:
+    return @ret;
+}
