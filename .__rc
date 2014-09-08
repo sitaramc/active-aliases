@@ -26,13 +26,28 @@
 # ---------- ALL ----------
 # 'c' field eq 'ALL' means apply this transform to ANY incoming command
 
-# this must come *before* all other transformations, so it is in the shipped
-# rc file (the one in the same directory as the binary).
+# these must come *before* all other transformations, so they are in the
+# shipped rc file (the one in the same directory as the binary).
 
-ALL	%% LF	%1 ./LF1
-ALL	%% LF(\d)	%1 ./LF%2
-ALL	%% (\D\S*)/LF	%1 %2/LF1
-ALL	%% %/LF(\d)	%1 %2/`cd %2 ;ls -Atrc|tail -%3|head -1`	print STDERR "+%2/" . `cd %2 ;ls -Atrc|tail -%3|head -1`
+# make normal commands go through __ by prefixing with a "." (bloody zsh takes
+# over the _-prefixed versions)
+ALL	\.%	%1
+
+ALL	%% LF	%1 ./LF1.
+ALL	%% LF(\D\S+)	%1 ./LF1%2
+ALL	%% LF(\d)	%1 ./LF%2.
+ALL	%% LF(\d\S+)	%1 ./LF%2
+
+ALL	%% %/LF	%1 %2/LF1.
+ALL	%% %/LF(\D\S+)	%1 %2/LF1%3
+ALL	%% %/LF(\d)	%1 %2/LF%3.
+
+ALL	%% %/LF(\d)(\S+)	%1 %2/`cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`	print STDERR "+%2/" . `cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`
+
+ALL	%% LL	%1 ./LL1
+ALL	%% LL(\d)	%1 ./LL%2
+ALL	%% (\D\S*)/LL	%1 %2/LL1
+ALL	%% %/LL(\d)	%1 %2/`cd %2 ;ls -A|tail -%3|head -1`	print STDERR "+%2/" . `cd %2 ;ls -A|tail -%3|head -1`
 
 ALL	%% Ym-%	%1 `date +%Y-%m-`%2
 ALL	%% Ymd-%	%1 `date +%Y-%m-%d-`%2
@@ -43,14 +58,28 @@ dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
 dm	dm %%	( ( nice %1 >/dev/null 2>&1 ) & )
 
 # ---------- task ----------
-tw	tw help$	perl -ne 'next unless /##/; print "\t" unless /^##/; print' ~/.taskrc
-tw	tw \.	tw `task _ids | tail -1`
-tw	tw (\d+)$	task %1 info
-tw	tw %% (\d+)$	task %1 limit:%2
-tw	tw ([0-9a-f]{8})$	task `task _uuids | grep %1` info
-tw	tw ([0-9a-f]{8}) %%	tw `task _uuids | grep %1` %2
-tw	tw %% ::%	task %1 due:%2 wait:%2
-tw	tw	task
+# run reports A, B, and U quickly
+ta	ta	t A
+tb	tb	t B
+tl	tl	t list
+tu	tu	t U
+tt	tt$	task
+t	t help$	perl -ne 'next unless /##/; print "\t" unless /^##/; print' ~/.taskrc
+# the "." shortcut lets you operate on the latest non-completed/non-deleted task
+t	t \.	t `task _ids | tail -1`
+# unfortunately you can't do the same for "all" tasks (i.e., including
+# completed and deleted tasks), so I have a special report called "U" that
+# contains just id, UUID, desc.count.  We use that to get the uuid of the last
+# "all" task that matches the filter supplied and do something on it.
+t	t u %% -- %%	t `task rc.defaultwidth:0 rc.verbose:nothing U %1 | cut -c4-39 | tail -1` %2
+# ...or just take the last one regardless
+t	t u -- %%	t `task rc.defaultwidth:0 rc.verbose:nothing U | cut -c4-39 | tail -1` %1
+t	t (\d+)$	task %1 info
+t	t %% (\d+)$	task %1 limit:%2
+t	t ([0-9a-f]{8})$	task `task _uuids | grep %1` info
+t	t ([0-9a-f]{8}) %%	t `task _uuids | grep %1` %2
+t	t %% ::%	task %1 due:%2 wait:%2
+t	t	task
 
 # this is here as a sample; it won't be any use unless you installed 'ew', but
 # you can do this with grep as well if you wish
@@ -66,10 +95,10 @@ ew	ew ([lnv])	ew -%1
 # which
 vw	vw %%	vim `which %1`
 # path
-vp	vp % %	sf %1 -f -r %2 -e vim
+vp	vp % %	sf %2 -f -r %1 -e vim
 vp	vp %	sf -f -r %1 -e vim
 # file
-vf	vf % %	sf %1 -f %2 -e vim
+vf	vf % %	sf %2 -f %1 -e vim
 vf	vf %	sf -f %1 -e vim
 # line
 vl	vl i w %%	vl -i -w %1
@@ -109,6 +138,10 @@ tg	tg b	tg --boundary
 tg	tg s	tg status
 tg	tg	tg CDRR
 tg	tg CDRR	cd `git rev-parse --show-toplevel` ; tig
+
+# ---------- git ----------
+glg	glg$	glg 5
+glg	glg (\d+)$	git lg -%1 | less -R -F
 
 # many of these are likely to be specific to my environment
 # ---------- misc ----------
