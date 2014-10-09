@@ -53,9 +53,9 @@ ALL	%% Ym-%	%1 `date +%Y-%m-`%2
 ALL	%% Ymd-%	%1 `date +%Y-%m-%d-`%2
 
 # ---------- 'dm' (daemonise) ----------
-dm	dm %	xdg-open %1 >/dev/null 2>&1	-f "%1" and not -x "%1"
+dm	dm %	dm xdg-open %1	-f "%1" and not -x "%1"
+dm	dm %%	( ( sleep 2; nice %1 >/dev/null 2>&1 ) & )
 dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
-dm	dm %%	( ( nice %1 >/dev/null 2>&1 ) & )
 
 # ---------- task ----------
 # run reports A, B, and U quickly
