@@ -87,7 +87,7 @@ while (<>) {
 # unescape arguments for execution.  If an argument contains spaces, it is
 # quoted so the shell is happy.
 $fullcmd = join " ", map { quote_unesc($_) } split ' ', $fullcmd;
-say STDERR "+$fullcmd";
+say STDERR "+$fullcmd" unless $fullcmd =~ s(^\@)();
 no warnings;
 exec("$fullcmd") or die "__: $cmd_name: command not found\n";
 
