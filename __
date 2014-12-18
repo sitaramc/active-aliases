@@ -96,16 +96,16 @@ exec("$fullcmd") or die "__: $cmd_name: command not found\n";
 sub _shell {
     my $x = shift;
     $x = `$x`;
-    chomp $x;
-    $x =~ s/\n+/ /g;
-    # escape the results of the execution
+    # escape the results of the execution but not across lines
     # XXX WARNING XXX
-    # this means we assume each execution can at most create one "word"
-    return esc($x);
+    # this means we assume each execution can at most create one "word" per line
+    $x = esc($x);
+    $x =~ s/\n+/ /g;
+    return $x;
 }
 
 sub esc {
-    return uri_escape( +shift, "%\\s" );
+    return uri_escape( +shift, "% " );
     # we don't really want to escape anything except a space but we have
     # to escape the % also, since that is the lead character for the
     # escape sequence
