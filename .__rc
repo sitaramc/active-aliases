@@ -97,17 +97,23 @@ vw	vw %%	vim `which %1`
 # path
 vp	vp % %	sf %2 -f -r %1 -e vim
 vp	vp %	sf -f -r %1 -e vim
-# file
+# file (no eqvt in vim-Unite)
 vf	vf % %	sf %2 -f %1 -e vim
 vf	vf %	sf -f %1 -e vim
+# repo
+vr	vr %	vim `git ls-tree -r --name-only HEAD | grep -i %1`
+# mru (from viminfo)
+vm	vm %	vim `grep '^>' ~/.viminfo | cut -c3- | grep -i '%1[^/]*$'`
+# TODO -- a multiple select system which makes 'and' and 'or' conditions with
+# multiple patterns easier and more intuitive
 # line
-vl	vl i w %%	vl -i -w %1
-vl	vl iw %%	vl -i -w %1
-vl	vl w i %%	vl -i -w %1
-vl	vl wi %%	vl -i -w %1
-vl	vl i %%	vl -i %1
-vl	vl w %%	vl -w %1
-vl	vl %%	vim -c 'Grep %1'
+vg	vg i w %%	vg -i -w %1
+vg	vg iw %%	vg -i -w %1
+vg	vg w i %%	vg -i -w %1
+vg	vg wi %%	vg -i -w %1
+vg	vg i %%	vg -i %1
+vg	vg w %%	vg -w %1
+vg	vg %%	vim -c 'Grep %1'
 
 # ---------- chmod ----------
 # most common uses of chmod
