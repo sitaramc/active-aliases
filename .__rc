@@ -151,7 +151,7 @@ glg	glg (\d+)$	git lg -%1 | less -R -F
 
 # many of these are likely to be specific to my environment
 # ---------- misc ----------
-save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
+# save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
 t1	t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
 t4	t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
 
