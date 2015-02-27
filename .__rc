@@ -58,12 +58,10 @@ dm	dm %%	( ( sleep 2; nice %1 >/dev/null 2>&1 ) & )
 dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
 
 # ---------- task ----------
-# run reports A, B, and U quickly
-ta	ta	t A
-tb	tb	t B
 tl	tl	t list
-tu	tu	t U
-tt	tt$	task
+tdl	tdl	t d list
+t	t d %%	t +DIR +$(basename $PWD) %1
+t	t % d	t %1 +DIR +$(basename $PWD)
 t	t help$	perl -ne 'next unless /##/; print "\t" unless /^##/; print' ~/.taskrc
 # the "." shortcut lets you operate on the latest non-completed/non-deleted task
 t	t \.	t `task _ids | tail -1`
@@ -95,8 +93,8 @@ ew	ew ([lnv])	ew -%1
 # which
 vw	vw %%	vim `which %1`
 # path
-vp	vp % %	sf %2 -f -r %1 -e vim
-vp	vp %	sf -f -r %1 -e vim
+vd	vd % %	sf %2 -f -r %1 -e vim
+vd	vd %	sf -f -r %1 -e vim
 # file (no eqvt in vim-Unite)
 vf	vf % %	sf %2 -f %1 -e vim
 vf	vf %	sf -f %1 -e vim
