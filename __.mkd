@@ -15,6 +15,10 @@ done is what gets executed.
 
 Be sure to read at least upto the examples section below if that isn't clear.
 
+Note: the idea of applying a series of transformations to something, based on
+matching a list of patterns is not new.  If you don't know where I got it
+from, you're not old enough ;-)
+
 ## motivation
 
 zsh lets you say, for example, `alias -g .='$(task _ids | tail -1)'`.  This
