@@ -153,6 +153,8 @@ bf	bf d	openssl bf -d
 # save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
 t1	t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
 t4	t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
+qd	qd %	less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
+PWGEN	PWGEN	cat /usr/share/dict/words|egrep '^.{3,6}$'|shuf 2>/dev/null|head -1000|egrep '^[a-z]*$'|column|head
 
 # blow(fish pipes (blowpipes??)
 bf	bf e	openssl bf -salt
