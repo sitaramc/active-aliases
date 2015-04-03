@@ -142,6 +142,13 @@ glg	glg$	glg 5
 glg	glg (\d+)$	git lg -%1 | less -R -F
 
 # many of these are likely to be specific to my environment
+# ---------- blowfish ----------
+bf	bf ea	bf e -a
+bf	bf da	bf d -a
+bf	bf e	openssl bf -salt
+bf	bf d	openssl bf -d
+# TODO: inplace enc/dec
+
 # ---------- misc ----------
 # save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
 t1	t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
