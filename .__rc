@@ -92,18 +92,12 @@ ew	ew ([lnv])	ew -%1
 # ---------- vim ----------
 # which
 vw	vw %%	vim `which %1`
-# path
-vd	vd % %	sf %2 -f -r %1 -e vim
-vd	vd %	sf -f -r %1 -e vim
-# file (no eqvt in vim-Unite)
-vf	vf % %	sf %2 -f %1 -e vim
-vf	vf %	sf -f %1 -e vim
-# repo
-vr	vr %	vim `git ls-tree -r --name-only HEAD | grep -i %1`
 # mru (from viminfo)
-vm	vm %	vim `grep '^>' ~/.viminfo | cut -c3- | grep -i '%1[^/]*$'`
-# TODO -- a multiple select system which makes 'and' and 'or' conditions with
-# multiple patterns easier and more intuitive
+vm	vm %%	vv -m %1
+# dir
+vd	vd %%	vv %1
+# repo
+vr	vr %%	vv -r %1
 # line
 vg	vg i w %%	vg -i -w %1
 vg	vg iw %%	vg -i -w %1
