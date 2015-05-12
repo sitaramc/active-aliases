@@ -98,7 +98,7 @@ sub _shell {
     $x = `$x`;
     # escape the results of the execution but not across lines
     # XXX WARNING XXX
-    # this means we assume each execution can at most create one "word" per line
+    # i.e., this behaves like 'map', not 'xargs' (one line is one "item")
     $x = esc($x);
     $x =~ s/\n+/ /g;
     return $x;
