@@ -32,6 +32,9 @@ my $cmd_name = shift;
 
 @ARGV = get_rc_filenames();
 
+# completion help
+_commands() if $cmd_name eq '_commands';     # does not return
+
 # TODO: this needs to go into its own config file eventually
 while (<>) {
     chomp; next unless /\S/; next if /^\s*#/;
@@ -146,4 +149,18 @@ sub get_rc_filenames {
     }
 
     return @ret;
+}
+
+sub _commands {
+    my %commands;
+    while (<>) {
+        chomp; next unless /\S/; next if /^\s*#/; next if /^ALL/;
+        s/\t.*//; next if /^ALL/;
+        $commands{$_}++;
+    }
+    # map { say } sort keys %commands;
+    say "abc:'this is abc'";
+    say "def:'and this is def'";
+
+    exit 0;
 }
