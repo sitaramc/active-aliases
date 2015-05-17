@@ -154,13 +154,8 @@ sub get_rc_filenames {
 sub _commands {
     my %commands;
     while (<>) {
-        chomp; next unless /\S/; next if /^\s*#/; next if /^ALL/;
-        s/\t.*//; next if /^ALL/;
-        $commands{$_}++;
+        print if s/^## //;
     }
-    # map { say } sort keys %commands;
-    say "abc:'this is abc'";
-    say "def:'and this is def'";
 
     exit 0;
 }

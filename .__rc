@@ -31,6 +31,8 @@
 
 # make normal commands go through __ by prefixing with a "." (bloody zsh takes
 # over the _-prefixed versions)
+
+## *:(dir/)?LF[1-9]?, (dir/)?LL[1-9]?, Ym-..., Ymd-...
 ALL	\.%	%1
 
 ALL	%% LF	%1 ./LF1.
@@ -53,38 +55,46 @@ ALL	%% Ym-%	%1 `date +%Y-%m-`%2
 ALL	%% Ymd-%	%1 `date +%Y-%m-%d-`%2
 
 # ---------- 'dm' (daemonise) ----------
+## dm:daemonise; dm (sleep time)? file|command
 dm	dm %	dm xdg-open %1	-f "%1" and not -x "%1"
 dm	dm %%	( ( sleep 1; nice %1 >/dev/null 2>&1 ) & )
 dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
 
 # ---------- task ----------
+## t:task; help, tl list, tt next, ta A, tb B, tdl t +DIR +<pwd basename> list
 tl	tl	t list
 tt	tt	t next
 ta	ta	t A
 tb	tb	t B
 tdl	tdl	t d list
+## t:task; t d ==> t +DIR +<pwd basename>, t % d ==> t %1 +DIR +<pwd basename>
 t	t d %%	t +DIR +$(basename $PWD) %1
 t	t % d	t %1 +DIR +$(basename $PWD)
 t	t help$	perl -ne 'next unless /##/; print "\t" unless /^##/; print' ~/.taskrc
 # the "." shortcut lets you operate on the latest non-completed/non-deleted task
+## t:task; t . ==> last non-C, non-D task
 t	t \.	t `task _ids | tail -1`
 # unfortunately you can't do the same for "all" tasks (i.e., including
 # completed and deleted tasks), so I have a special report called "U" that
 # contains just id, UUID, desc.count.  We use that to get the uuid of the last
 # "all" task that matches the filter supplied and do something on it.
+## t:task; t u (<cond>)? -- <action> ==> last "all" task
 t	t u %% -- %%	t `task rc.defaultwidth:0 rc.verbose:nothing U %1 | cut -c4-39 | tail -1` %2
 # ...or just take the last one regardless
 t	t u -- %%	t `task rc.defaultwidth:0 rc.verbose:nothing U | cut -c4-39 | tail -1` %1
+## t:task; t \d+ ==> info, t %% \d+$ ==> limit, t <short uuid> ==> expanded uuid
 t	t (\d+)$	task %1 info
 t	t %% (\d+)$	task %1 limit:%2
 t	t ([0-9a-f]{8})$	task `task _uuids | grep %1` info
 t	t ([0-9a-f]{8}) %%	t `task _uuids | grep %1` %2
+## t:task; t %% :% ==> due+wait
 t	t %% ::%	task %1 due:%2 wait:%2
 t	t	task
 
 # this is here as a sample; it won't be any use unless you installed 'ew', but
 # you can do this with grep as well if you wish
 # ---------- ew ----------
+## ew: ew ([0-9])? ==> -n -%1, ([lnv])? -%1
 # this one makes it hard to grep for single digits; oh well...
 ew	ew ([1-9])	ew -n -%1
 ew	ew ([lnv])	ew -%1
@@ -94,14 +104,19 @@ ew	ew ([lnv])	ew -%1
 # this is useless for others but shows how canonicalisation happens.
 # ---------- vim ----------
 # which
+## vw:vim which
 vw	vw %%	$EDITOR `which %1`	$ENV{EDITOR}
 # mru (from viminfo)
+## vm:vim mru
 vm	vm %%	vv -m %1
 # dir
+## vd:vim file in dir
 vd	vd %%	vv %1
 # repo
+## vr:vim file in repo
 vr	vr %%	vv -r %1
 # line
+## vg:vim Grep; vg [iw]* ==> -i/-w
 vg	vg i w %%	vg -i -w %1
 vg	vg iw %%	vg -i -w %1
 vg	vg w i %%	vg -i -w %1
@@ -112,28 +127,26 @@ vg	vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 
 # ---------- chmod ----------
 # most common uses of chmod
+## ch:chmod; ch r ==> -R go+rx, w ==> u+w, x ==> +x
 ch	ch r	chmod -R go+rX
 ch	ch w	chmod u+w
 ch	ch x	chmod +x
 
 # ---------- ltrc|ew|tail ----------
-# 2 args; note that we don't cater to N > 9 here
-lf	lf (\d) %	lf %2 %1
-lf	lf % (\d)$	lf %1 . -%2	-d "%1"
-lf	lf % (\d)$	lf . %1 -%2
-lf	lf % %$	lf %2 %1 -10	not -d "%1"
-lf	lf % %$	lf %1 %2 -10
-# 1 arg
+# lf: <dir> <patt> <count>
+## lf:latest files, lf dir? patt? count? (only one or all 3; defaults . . 10)
+lf	lf$	lf . . -10
+lf	lf \d+$	lf . . -%1
 lf	lf %$	lf %1 . -10	-d "%1"
 lf	lf %$	lf . %1 -10
-# no args
-lf	lf$	lf . . -10
 # canonical form 1
 lf	lf % \. -%	ls -Altrc "%1" | tail -%2
 # canonical form 2
 lf	lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
 
 # ---------- tig ----------
+## ts:tig s (status)
+## tg:tig, tg ==> tig, tg b ==> tig --boundary (will cd to repo root dir first)
 ts	ts	tg s
 tg	tg b	tg --boundary
 tg	tg s	tg status
@@ -141,29 +154,53 @@ tg	tg	tg CDRR
 tg	tg CDRR	cd `git rev-parse --show-toplevel` ; tig
 
 # ---------- git ----------
+## glg:glg \d* ==> git lg -n(5)
 glg	glg$	glg 5
 glg	glg (\d+)$	git lg -%1 | less -R -F
 
 # many of these are likely to be specific to my environment
 # ---------- blowfish ----------
+## bf:bf e|d|ea|da
 bf	bf ea	bf e -a
 bf	bf da	bf d -a
 bf	bf e	openssl bf -salt
 bf	bf d	openssl bf -d
 # TODO: inplace enc/dec
 
+# ---------- from jeeves ----------
+## field:|field N
+field	field (\d+)	awk '{print $%1}'
+## hdt:|hdt
+hdt	hdt	perl -pe 's/^\d{5,}(\.\d+)?/localtime $&/e'
+## hd:|hd; hexdump using od options
+hd	hd	od -Ax -tx1z -v
+## flsum:|flsum (\d+)?; file list summary, keep upto NUM slashes and summarise
+flsum	flsum$	flsum 2
+flsum	flsum %$	perl -pe "s/(([^\/]+\/){%1}).*/\$1/" | sort | uniq -c
+## InPlabe:fake entry to protect
+## InPlace:(NO WARNINGS, NO SECOND CHANCES) frompatt topatt filelist...
+InPlace	InPlace -i % %	perl -w -0777 -pi -e "s(%1)(%2)gi"
+InPlace	InPlace % %	perl -w -0777 -pi -e "s(%1)(%2)g"
+## qfrpm:rpm -qf (args or STDIN)
+qfrpm	qfrpm$	xargs rpm -qf
+qfrpm	qfrpm	rpm -qf
+## dot:dot gv-file [png-file] (defaults to ~/junk.png)
+dot	dot %$	dot %1 ~/junk.png
+dot	dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
+
 # ---------- misc ----------
 # save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
+## t1
 t1	t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
+## t4
 t4	t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
+## qd:qd rpmname
 qd	qd %	less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
+## PWGEN
 PWGEN	PWGEN	cat /usr/share/dict/words|egrep '^.{3,6}$'|shuf 2>/dev/null|head -1000|egrep '^[a-z]*$'|column|head
 
-# blow(fish pipes (blowpipes??)
-bf	bf e	openssl bf -salt
-bf	bf d	openssl bf -d
-
 # gaf
+## gu:gaf cycle && gaf pall
 gu	gu	gaf cycle && gaf pall
 
 # vim: ts=16:
