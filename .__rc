@@ -60,40 +60,9 @@ dm	dm %	dm xdg-open %1	-f "%1" and not -x "%1"
 dm	dm %%	( ( sleep 1; nice %1 >/dev/null 2>&1 ) & )
 dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
 
-# ---------- task ----------
-## t:task; help, tl list, tt next, ta A, tb B, tdl t +DIR +<pwd basename> list
-tl	tl	t list
-tt	tt	t next
-ta	ta	t A
-tb	tb	t B
-tdl	tdl	t d list
-## t:task; t d ==> t +DIR +<pwd basename>, t % d ==> t %1 +DIR +<pwd basename>
-t	t d %%	t +DIR +$(basename $PWD) %1
-t	t % d	t %1 +DIR +$(basename $PWD)
-t	t help$	perl -ne 'next unless /##/; print "\t" unless /^##/; print' ~/.taskrc
-# the "." shortcut lets you operate on the latest non-completed/non-deleted task
-## t:task; t . ==> last non-C, non-D task
-t	t \.	t `task _ids | tail -1`
-# unfortunately you can't do the same for "all" tasks (i.e., including
-# completed and deleted tasks), so I have a special report called "U" that
-# contains just id, UUID, desc.count.  We use that to get the uuid of the last
-# "all" task that matches the filter supplied and do something on it.
-## t:task; t u (<cond>)? -- <action> ==> last "all" task
-t	t u %% -- %%	t `task rc.defaultwidth:0 rc.verbose:nothing U %1 | cut -c4-39 | tail -1` %2
-# ...or just take the last one regardless
-t	t u -- %%	t `task rc.defaultwidth:0 rc.verbose:nothing U | cut -c4-39 | tail -1` %1
-## t:task; t \d+ ==> info, t %% \d+$ ==> limit, t <short uuid> ==> expanded uuid
-t	t (\d+)$	task %1 info
-t	t %% (\d+)$	task %1 limit:%2
-t	t ([0-9a-f]{8})$	task `task _uuids | grep %1` info
-t	t ([0-9a-f]{8}) %%	t `task _uuids | grep %1` %2
-## t:task; t %% :% ==> due+wait
-t	t %% ::%	task %1 due:%2 wait:%2
-t	t	task
-
+# ---------- ew ----------
 # this is here as a sample; it won't be any use unless you installed 'ew', but
 # you can do this with grep as well if you wish
-# ---------- ew ----------
 ## ew: ew ([0-9])? ==> -n -%1, ([lnv])? -%1
 # this one makes it hard to grep for single digits; oh well...
 ew	ew ([1-9])	ew -n -%1
