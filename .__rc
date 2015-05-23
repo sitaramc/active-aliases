@@ -44,7 +44,9 @@ ALL	%% %/LF	%1 %2/LF1.
 ALL	%% %/LF(\D\S+)	%1 %2/LF1%3
 ALL	%% %/LF(\d)	%1 %2/LF%3.
 
-ALL	%% %/LF(\d)(\S+)	%1 %2/`cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`	print STDERR "+%2/" . `cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`
+ALL	%% %/LF(\d)(\S+)	\
+                                %1 %2/`cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`	\
+                                                print STDERR "+%2/" . `cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`
 
 ALL	%% LL	%1 ./LL1
 ALL	%% LL(\d)	%1 ./LL%2
@@ -71,6 +73,25 @@ ew	ew ([lnv])	ew -%1
 # some of these require 'sf' (which is a wrapper over 'find').  As such, they
 # won't be generally useful.  Ditto with the vim command 'Grep'.  Overall,
 # this is useless for others but shows how canonicalisation happens.
+
+# ---------- mgrep ----------
+## mgrep:mgrep word list; grep multiple words, all words must occur.  First word is colored
+mg	mg	mgrep
+mgrep	mgrep	mgrep	$::I=""
+mgrep	mgrep -i	mgrep	$::I="-i"
+mgrep	mgrep %$	mgrep %1 .
+mgrep	mgrep % %%	@true	my $f= \
+                                                join("|", \
+                                                    map \
+                                                        "grep $::I $_", \
+                                                            split(' ', "%2") \
+                                                ); \
+                                                $f.="|grep $::I --color %1"; \
+                                                system($f); \
+                                                1
+mgrep	mgrep %%	@echo usage: series of words to grep on
+mgrep	mgrep	@echo usage: series of words to grep on
+
 # ---------- vim ----------
 # which
 ## vw:vim which
