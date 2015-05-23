@@ -35,9 +35,12 @@ my $cmd_name = shift;
 # completion help
 _commands() if $cmd_name eq '_commands';     # does not return
 
-# TODO: this needs to go into its own config file eventually
+my $cont = '';
 while (<>) {
     chomp; next unless /\S/; next if /^\s*#/;
+
+    if ($cont) { s/^\s+//; $_ = $cont . $_; $cont = '' }
+    if (/\\$/) { s/\\$//; $cont = $_; next }
 
     my ( $cmd, $pattern, $repl, $cond ) = split /\t/;
     next unless $cmd eq $cmd_name or $cmd eq 'ALL';
