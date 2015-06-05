@@ -18,10 +18,14 @@
 ###     LS
 
 # syntax
-# aliasname <TAB> pattern <TAB> replacement
+# aliasname <TAB> pattern <TAB> replacement(shell) [ <TAB> condition(perl) ]
 # %% in pattern is (.+); % is (\S+)
 # %<digits> in repl is corresponding paren
-# rules are matched in sequence
+# rules are matched in sequence, condition is eval-ed in same perl process
+
+# some of these require 'sf' (which is a wrapper over 'find').  As such, they
+# won't be generally useful.  Ditto with the vim command 'Grep'.  Overall,
+# this is useless for others but shows how canonicalisation happens.
 
 # ---------- ALL ----------
 # 'c' field eq 'ALL' means apply this transform to ANY incoming command
@@ -56,25 +60,45 @@ ALL	%% %/LL(\d)	%1 %2/`cd %2 ;ls -A|tail -%3|head -1`	print STDERR "+%2/" . `cd 
 ALL	%% Ym-%	%1 `date +%Y-%m-`%2
 ALL	%% Ymd-%	%1 `date +%Y-%m-%d-`%2
 
-# ---------- 'dm' (daemonise) ----------
+# ---- process control: dm, slow, nolang
+
 ## dm:daemonise; dm (sleep time)? file|command
 dm	dm %	dm xdg-open %1	-f "%1" and not -x "%1"
 dm	dm %%	( ( sleep 1; nice %1 >/dev/null 2>&1 ) & )
 dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
+## slow:slow (uN|dN|uN dN)
+slow	slow u(\d+) d(\d+)	_slow -u %1 -d %2
+slow	slow u(\d+)	_slow -u %1 -d 1000
+slow	slow d(\d+)	_slow -d %1 -u 1000
+slow	slow	@echo usage: slow uN|dN|uN dN
+_slow	_slow	trickle -s
+# nolang:delete LANG and LC_* then run
+nolang	nolang %	%1	delete $ENV{LANG}; \
+                                                map { delete $ENV{$_} } \
+                                                    grep /^LC_/, keys %ENV; \
+                                                1
 
-# ---------- ew ----------
-# this is here as a sample; it won't be any use unless you installed 'ew', but
-# you can do this with grep as well if you wish
-## ew: ew ([0-9])? ==> -n -%1, ([lnv])? -%1
-# this one makes it hard to grep for single digits; oh well...
-ew	ew ([1-9])	ew -n -%1
-ew	ew ([lnv])	ew -%1
+# ---- vim: vw/vm/vd/vr/vg
 
-# some of these require 'sf' (which is a wrapper over 'find').  As such, they
-# won't be generally useful.  Ditto with the vim command 'Grep'.  Overall,
-# this is useless for others but shows how canonicalisation happens.
+## vw:vim which
+vw	vw %%	$EDITOR `which %1`	$ENV{EDITOR}
+## vm:vim mru (from viminfo)
+vm	vm %%	vv -m %1
+## vd:vim file in dir
+vd	vd %%	vv %1
+## vr:vim file in repo
+vr	vr %%	vv -r %1
+## vg:vim Grep; vg [iw]* ==> -i/-w
+vg	vg i w %%	vg -i -w %1
+vg	vg iw %%	vg -i -w %1
+vg	vg w i %%	vg -i -w %1
+vg	vg wi %%	vg -i -w %1
+vg	vg i %%	vg -i %1
+vg	vg w %%	vg -w %1
+vg	vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 
-# ---------- mgrep ----------
+# ---- text handling: mgrep, InPlace, field, hdt, hd
+
 ## mgrep:mgrep word list; grep multiple words, prefix with "-" to exclude.  First word is colored
 mg	mg	mgrep
 mgrep	mgrep	mgrep	$::I=""
@@ -92,37 +116,24 @@ mgrep	mgrep % %%	@true	my $f= \
 mgrep	mgrep %%	@echo usage: series of words to grep on
 mgrep	mgrep	@echo usage: series of words to grep on
 
-# ---------- vim ----------
-# which
-## vw:vim which
-vw	vw %%	$EDITOR `which %1`	$ENV{EDITOR}
-# mru (from viminfo)
-## vm:vim mru
-vm	vm %%	vv -m %1
-# dir
-## vd:vim file in dir
-vd	vd %%	vv %1
-# repo
-## vr:vim file in repo
-vr	vr %%	vv -r %1
-# line
-## vg:vim Grep; vg [iw]* ==> -i/-w
-vg	vg i w %%	vg -i -w %1
-vg	vg iw %%	vg -i -w %1
-vg	vg w i %%	vg -i -w %1
-vg	vg wi %%	vg -i -w %1
-vg	vg i %%	vg -i %1
-vg	vg w %%	vg -w %1
-vg	vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
+## InPlace:(NO WARNINGS, NO SECOND CHANCES) frompatt topatt filelist...
+InPlace	InPlace -i % %	perl -w -0777 -pi -e "s(%1)(%2)gi"
+InPlace	InPlace % %	perl -w -0777 -pi -e "s(%1)(%2)g"
 
-# ---------- chmod ----------
-# most common uses of chmod
+## field:|field N
+field	field (\d+)	awk '{print $%1}'
+## hdt:|hdt
+hdt	hdt	perl -pe 's/^\d{5,}(\.\d+)?/localtime $&/e'
+## hd:|hd; hexdump using od options
+hd	hd	od -Ax -tx1z -v
+
+# ---- file handing: ch, lf
+
 ## ch:chmod; ch r ==> -R go+rx, w ==> u+w, x ==> +x
 ch	ch r	chmod -R go+rX
 ch	ch w	chmod u+w
 ch	ch x	chmod +x
 
-# ---------- ltrc|ew|tail ----------
 # lf: <dir> <patt> <count>
 ## lf:latest files, lf dir? patt? count? (only one or all 3; defaults . . 10)
 lf	lf$	lf . . -10
@@ -134,7 +145,8 @@ lf	lf % \. -%	ls -Altrc "%1" | tail -%2
 # canonical form 2
 lf	lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
 
-# ---------- tig ----------
+# ---- git (ts/tg, glg, t1/t4)
+
 ## ts:tig s (status)
 ## tg:tig, tg ==> tig, tg b ==> tig --boundary (will cd to repo root dir first)
 ts	ts	tg s
@@ -143,13 +155,44 @@ tg	tg s	tg status
 tg	tg	tg CDRR
 tg	tg CDRR	cd `git rev-parse --show-toplevel` ; tig
 
-# ---------- git ----------
 ## glg:glg \d* ==> git lg -n(5)
 glg	glg$	glg 5
 glg	glg (\d+)$	git lg -%1 | less -R -F
 
-# many of these are likely to be specific to my environment
-# ---------- blowfish ----------
+## t1
+t1	t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
+## t4
+t4	t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
+
+# ---- system (qf, qd, gu, fssum, flsum)
+
+## qf:rpm -qf (args or STDIN)
+qf	qf$	xargs rpm -qf
+qf	qf	rpm -qf
+
+## qd:qd rpmname
+qd	qd %	less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
+
+## gu:gaf cycle && gaf pall
+gu	gu	gaf cycle && gaf pall
+
+## flsum:|flsum (\d+)?; file list summary, keep upto NUM slashes and summarise
+flsum	flsum$	flsum 2
+flsum	flsum %$	perl -pe "s/(([^\/]+\/){%1}).*/\$1/" | sort | uniq -c
+
+## fssum:fssum [dir], print #dirs, #files, size dist
+fssum	fssum %	fssum	chdir $1
+fssum	fssum	@du -sm .; \
+                                echo -e `find . -type d | wc -l `'\tdirectories'; \
+                                echo -e `find . -type f | wc -l `'\tfiles'; \
+                                echo '  FILES MB      CUM MB'; \
+                                find . -type f -print0 | \
+                                    xargs -0 du -sm | cut -f1 | \
+                                    sort | uniq -c | sort -k 2nr | \
+                                perl -lpe '($a,$b)=split;$tot+=$a*$b;$_.="\t$tot"'
+
+# ---- sec (bf, PWGEN)
+
 ## bf:bf e|d|ea|da
 bf	bf ea	bf e -a
 bf	bf da	bf d -a
@@ -157,40 +200,13 @@ bf	bf e	openssl bf -salt
 bf	bf d	openssl bf -d
 # TODO: inplace enc/dec
 
-# ---------- from jeeves ----------
-## field:|field N
-field	field (\d+)	awk '{print $%1}'
-## hdt:|hdt
-hdt	hdt	perl -pe 's/^\d{5,}(\.\d+)?/localtime $&/e'
-## hd:|hd; hexdump using od options
-hd	hd	od -Ax -tx1z -v
-## flsum:|flsum (\d+)?; file list summary, keep upto NUM slashes and summarise
-flsum	flsum$	flsum 2
-flsum	flsum %$	perl -pe "s/(([^\/]+\/){%1}).*/\$1/" | sort | uniq -c
-## InPlabe:fake entry to protect
-## InPlace:(NO WARNINGS, NO SECOND CHANCES) frompatt topatt filelist...
-InPlace	InPlace -i % %	perl -w -0777 -pi -e "s(%1)(%2)gi"
-InPlace	InPlace % %	perl -w -0777 -pi -e "s(%1)(%2)g"
-## qfrpm:rpm -qf (args or STDIN)
-qfrpm	qfrpm$	xargs rpm -qf
-qfrpm	qfrpm	rpm -qf
-## dot:dot gv-file [png-file] (defaults to ~/junk.png)
-dot	dot %$	dot %1 ~/junk.png
-dot	dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
-
-# ---------- misc ----------
-# save	save %%	7z a -tzip -mem=AES256 -r -p /tmp/save.`date -I`.$$ %1 ; rsync -vP /tmp/save.`date -I`.$$ atc:t
-## t1
-t1	t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
-## t4
-t4	t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
-## qd:qd rpmname
-qd	qd %	less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
 ## PWGEN
 PWGEN	PWGEN	cat /usr/share/dict/words|egrep '^.{3,6}$'|shuf 2>/dev/null|head -1000|egrep '^[a-z]*$'|column|head
 
-# gaf
-## gu:gaf cycle && gaf pall
-gu	gu	gaf cycle && gaf pall
+# ---- misc (dot)
+
+## dot:dot gv-file [png-file] (defaults to ~/junk.png)
+dot	dot %$	dot %1 ~/junk.png
+dot	dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
 
 # vim: ts=16:
