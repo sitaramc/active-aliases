@@ -68,8 +68,8 @@ dm	dm %%	( ( sleep 1; nice %1 >/dev/null 2>&1 ) & )
 dm	dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
 ## slow:slow (uN|dN|uN dN)
 slow	slow u(\d+) d(\d+)	_slow -u %1 -d %2
-slow	slow u(\d+)	_slow -u %1 -d 1000
-slow	slow d(\d+)	_slow -d %1 -u 1000
+slow	slow u(\d+)	_slow -u %1
+slow	slow d(\d+)	_slow -d %1
 slow	slow	@echo usage: slow uN|dN|uN dN
 _slow	_slow	trickle -s
 # nolang:delete LANG and LC_* then run
@@ -137,7 +137,7 @@ ch	ch x	chmod +x
 # lf: <dir> <patt> <count>
 ## lf:latest files, lf dir? patt? count? (only one or all 3; defaults . . 10)
 lf	lf$	lf . . -10
-lf	lf \d+$	lf . . -%1
+lf	lf (\d+)$	lf . . -%1
 lf	lf %$	lf %1 . -10	-d "%1"
 lf	lf %$	lf . %1 -10
 # canonical form 1
