@@ -67,16 +67,19 @@ while (<>) {
 
     # evaluate the extra condition line, if supplied, and skip this line if
     # things didn't work out
+    my $rc;
     if ($cond) {
         $cond =~ s/%(\d+)/$matches[$1]/gm;
         $cond = unesc($cond);
         say STDERR "?\t$cond" if $ENV{D};
-        my $rc = eval $cond;
+        $rc = eval $cond;
         say STDERR "X\t'$@'" unless defined($rc);
         say STDERR "!\t'$rc'" if $ENV{D} and $rc;
         next if not $rc;
     }
 
+    # substitute the cond result (buyer beware!)
+    $repl =~ s/%\?/$rc/gm;
     # change the "repl" string using the matched substrings
     $repl =~ s/%(\d+)/$matches[$1]/gm;
     # and if it now contains a backtick, reduce it to the output of the
