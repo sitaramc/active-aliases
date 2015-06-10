@@ -1,7 +1,9 @@
-# active aliases
+<!--
+    options: toc
+    to: html-N
+-->
 
-<!-- pandoc: html-N -->
-<!-- pandoc: toc -->
+% active aliases
 
 This is documentation for "active aliases", a small tool I wrote a couple
 months ago. The program itself is called `__` (yes, that's two underscores),
@@ -19,7 +21,7 @@ Note: the idea of applying a series of transformations to something, based on
 matching a list of patterns is not new.  If you don't know where I got it
 from, you're not old enough ;-)
 
-## motivation
+# motivation
 
 zsh lets you say, for example, `alias -g .='$(task _ids | tail -1)'`.  This
 allows me to type `task . <commands>` and it would substitute the period with
@@ -36,7 +38,7 @@ Finally, this seems like a cheap way to get directory-specific aliases (i.e.,
 aliases that are valid only when I am in a certain directory or its
 subdirectories).
 
-## basic principle
+# basic principle
 
 *   a user types a command in such a way that `__` is invoked (see
     "invocation" section later for details).
@@ -59,7 +61,7 @@ subdirectories).
 When all lines have been processed, whatever command is the result is
 executed.
 
-## examples
+# examples
 
 Note that the rc lines in the examples are correct except for not showing
 the hard tabs between the 3 fields that the syntax requires.
@@ -178,7 +180,7 @@ it should not be too bad.
 
 That's about it.
 
-## invocation
+# invocation
 
 You can invoke `__` in 3 ways:
 
@@ -211,7 +213,7 @@ You can invoke `__` in 3 ways:
     means, you may have a bit of a confusing time until you realise what
     happened.  At that point, the best thing is to go to method 1.
 
-## rc files
+# rc files
 
 The program picks up rc files in the following order.  The combined content of
 all of them is what is used:
@@ -226,7 +228,7 @@ NOTE: If your current directory is not \$HOME (say your PWD is /tmp or
 something), then this will behave as if you were in \$HOME (i.e., it will never
 look for rc files outside your home directory tree).
 
-## rc syntax
+# rc syntax
 
 Each line has the following fields, with a hard tab (actual tab character, not
 just spaces) between them: command, from, to, condition.
@@ -249,11 +251,11 @@ just spaces) between them: command, from, to, condition.
 4.  The "cond" is some extra code that is evaluated in perl.  If it exists, it
     must return true, otherwise the rc line is skipped.
 
-## installation
+# installation
 
 Just put it in your path somewhere.
 
-## appendix 1 -- unknown command helper code
+# appendix 1 -- unknown command helper code
 
 Here's the code.  Note that on bash the function should be called
 `command_not_found_handle` (yes -- one letter at the end dropped!)
