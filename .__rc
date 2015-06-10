@@ -191,7 +191,7 @@ fssum	fssum	@du -sm .; \
                                     sort | uniq -c | sort -k 2nr | \
                                 perl -lpe '($a,$b)=split;$tot+=$a*$b;$_.="\t$tot"'
 
-# ---- sec (bf, PWGEN)
+# ---- sec (bf, PWGEN, crypdf)
 
 ## bf:bf e|d|ea|da
 bf	bf ea	bf e -a
@@ -199,6 +199,21 @@ bf	bf da	bf d -a
 bf	bf e	openssl bf -salt
 bf	bf d	openssl bf -d
 # TODO: inplace enc/dec
+
+## crypdf:crypdf d|e infile outfile [other flags for enc], (password will be asked on STDIN)
+# note: okular as of 2015-06-06 does not read 256 bit encrypted files so no point
+crypdf	crypdf d % %	qpdf --empty --pages %1 --password=`cat` -- %2
+
+crypdf	crypdf e	crypdf e	chomp($ENV{CP_PW}=<STDIN>); \
+                                                $ENV{CP_FLAGS}="128 --use-aes=y";\
+                                                1
+
+crypdf	crypdf e % % %%$	\
+                                crypdf e %1 %2	$ENV{CP_FLAGS}.=" %3"; 1
+
+crypdf	crypdf e % %$	qpdf --empty --pages %1 -- \
+                                    --encrypt $CP_PW $CP_PW $CP_FLAGS -- \
+                                    %2
 
 ## PWGEN
 PWGEN	PWGEN	cat /usr/share/dict/words|egrep '^.{3,6}$'|shuf 2>/dev/null|head -1000|egrep '^[a-z]*$'|column|head
