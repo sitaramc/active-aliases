@@ -149,7 +149,10 @@ lf	lf % \. -%	ls -Altrc "%1" | tail -%2
 # canonical form 2
 lf	lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
 
-# ---- git (ts/tg, glg, t1/t4)
+# ---- git (--, ts/tg, glg, t1/t4)
+
+## --: git checkout - (sweet!)
+--	--	git co -
 
 ## ts:tig s (status)
 ## tg:tig, tg ==> tig, tg b ==> tig --boundary (will cd to repo root dir first)
