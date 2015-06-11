@@ -5,184 +5,304 @@
 
 % active aliases
 
-This is documentation for "active aliases", a small tool I wrote a couple
-months ago. The program itself is called `__` (yes, that's two underscores),
-but as you will see, I rarely even type that.
+"Active aliases" is a somewhat pretentious name I cooked up for a very simple
+way to write complex commands, especially in terms of argument handling.
+Clone the [repo](https://github.com/sitaramc/active-aliases) or grab the
+[script](https://github.com/sitaramc/active-aliases/blob/master/__) and the
+[sample rc
+file](https://github.com/sitaramc/active-aliases/blob/master/.__rc).
 
-Briefly, `__` is a way to transform user-typed commands into something else
-and execute the resulting command.  The program reads a series of pattern +
-replacement pairs, and if the pattern matches, the replacement becomes the
-current command.  The end result after all the pattern + replacement lines are
-done is what gets executed.
+# basics and some quick examples
 
-Be sure to read at least upto the examples section below if that isn't clear.
+@@box-r(The program itself is called `__` (yes, that's two underscores), but
+as you will see in the [invocation][inv] section, I rarely even type that.)@@
 
-Note: the idea of applying a series of transformations to something, based on
-matching a list of patterns is not new.  If you don't know where I got it
-from, you're not old enough ;-)
+Zsh has something called "global aliases", which are aliases that expand
+anywhere on the command line, not just in the command name.  I wanted
+something like that, but (a) I don't have zsh everywhere I need to work, (b) I
+want them to expand differently for different commands.
 
-# motivation
+For example, I want `ch r ...` to expand to `chmod -R go+rX ...`, but `gpg r
+...` to expand to `gpg -r sitaramc@gmail.com ...`, even though in both cases
+the word being expanded is the same (the letter 'r').
 
-zsh lets you say, for example, `alias -g .='$(task _ids | tail -1)'`.  This
-allows me to type `task . <commands>` and it would substitute the period with
-the id of the latest task added.
+@@box-r(Although you can't see it here, the rc file is TAB delimited; so just
+pretend you can see the hard tabs where there are several space characters!)@@
 
-While this is cool and all, that's a **global** alias, meaning it'll do that
-for any command in which I use `.` as an argument.  Imagine `cp /tmp/foo/* .`
-or something!  I need a way to restrict that specific expansion to only the
-task command.
+What I came up with is a way to take a command, and keep morphing it into
+something else, possibly in multiple steps, and execute whatever comes out at
+the end.  At each step, the replacement becomes the new command, which may be
+quite different from the old one.  (Note: until you read the [syntax][syn]
+section, just ignore the first column!)
 
-I also do not want to depend on zsh being available everywhere I work.
+Here's a *very small* example.  Notice how, if you give it just 'glg', it
+pretends you gave it 'glg 5' and proceeds from there:
 
-Finally, this seems like a cheap way to get directory-specific aliases (i.e.,
-aliases that are valid only when I am in a certain directory or its
-subdirectories).
+    # show last N (default 5) git commit subject lines
+    glg         glg$            glg 5
+    glg         glg (\d+)$      git log --oneline -%1 | less -R -F
 
-# basic principle
+Here is one more really simple one, where you can guess not only what `ch r
+/tmp/foo` should do, but also that a more elegant way to do this simply cannot
+exist :-)
 
-*   a user types a command in such a way that `__` is invoked (see
-    "invocation" section later for details).
+    ch          ch r            chmod -R go+rX
+    ch          ch w            chmod u+w
+    ch          ch x            chmod +x
 
-*   the `__` command reads its rc lines, one by one.
+# features/concepts
 
-*   each rc line has a "template" field and a "replacement" field.  The
-    command is matched against the template.
+## morphing the command in steps
 
-*   if it matches, the "replacement" becomes the new command.  Otherwise that
-    rc line is skipped
+@@box-r(Note: the idea of applying a series of transformations to something,
+based on matching a list of patterns is not new.  If you don't know where I
+got it from, you're not old enough ;-))@@
 
-*   in either case, processing continues with the next rc line.  **This
-    means a command can be changed multiple times**, if the output of one
-    transformation matches the template of a subsequent line.
+Here's an example of an alias that allows me to say 'cg cool', or 'cg fast',
+to set predefined CPU frequency governors, or for example, 'cg powersave'
+etc., for other governors without their own shortcut word.  In addition, if I
+type just 'cg', I get 'cg cool'.
 
-*   this repeats until all lines in the rc are done. See examples 1 and 4
-    below.
+    cg          cg$             cg cool
+    cg          cg cool$        cg ondemand
+    cg          cg fast$        cg performance
+    cg          cg              cpupower -c all frequency-set -g
 
-When all lines have been processed, whatever command is the result is
-executed.
+Actually, 'cg' morphs to 'cg cool', then 'cg cool' morphs to 'cg ondemand',
+and *that* finally morphs to 'cpupower -c all frequency-set -g ondemand'.
 
-# examples
+Here's a slightly longer, but still very simple, example.  I often encrypt
+files, either with my gpg key, or with an ad hoc (manually typed) symmetric
+key.  Also, sometimes I want the files ASCII-armored, and sometimes not.  I
+want to type the minimum number of characters needed, but I can never remember
+if it should be "ac" or "ca", so I want to allow both.  This gives me six
+possible arguments to my new "enc" command:
 
-Note that the rc lines in the examples are correct except for not showing
-the hard tabs between the 3 fields that the syntax requires.
+    enc         enc ca          enc c -a
+    enc         enc ac          enc c -a
+    enc         enc ra          enc r -a
+    enc         enc ar          enc r -a
+    enc         enc c           gpg -c --cipher-algo AES256
+    enc         enc r           gpg -e -r sitaramc@gmail.com
 
-Also note that some of these examples may make more sense if you're already
-familiar with those systems (taskwarrior, git, etc.), but even if you don't,
-it should not be too bad.
+When you type in "enc ca file", the first line converts it to "enc c -a file".
+Then the next 3 lines don't match, and the 5th line converts it to "gpg -c
+--cipher-algo AES256 -a file".  You can work out the other flows in a similar
+fashion.
 
-1.  The first example is already up there: `tw .` becomes `task 92 info`
-    assuming 92 is the last task id created for example.
+If you were to do this in a shell function, you'd need several 'if'
+statements, and it would look quite ugly.  The simple flow above is much more
+readable.
 
-    Say what?  Where's that `info` come from?
+## using conditions
 
-    Well there's also an "active alias" that says "if the command 'task' is
-    run with exactly one argument and that is a number, then append 'info' to
-    the command before you run it".
+Here's a bit of a tough one:
 
-    Cool huh?
+    # set screen brightness: default 5, min 3 max 99.
+    dim     dim$                    dim 5
+    dim     dim [0-2]$              @echo need number [3-99]
+    dim     dim [1-9][0-9][0-9]+$   @echo need number [3-99]
+    dim     dim (\d+)$              @xbacklight -set %1
+    dim     dim %%                  @echo need number [3-99]
 
-    rc lines:
+@@box-r(NOTE: a bit of regex knowledge assumed here, like capture groups.
+Also, see the [rc line syntax][syn] section later for what %% means.)@@
 
-        tw      tw \.           tw `task _ids | tail -1`
-        tw      tw (\d+)$       task %1 info
+This is better than writing it in shell, but not *much* better; some of the
+rough edges are showing up.
 
-    **You'll notice right away that these aliases chain.  So the sequence
-    matters here!**  In this example, `tw .` first becomes, say, `tw 92` based
-    on the first rule, then `tw 92` becomes `tw 92 info` based on the second
-    rule.
+To help with that, we define a fourth field, which is a **condition** to be
+met.  If it fails, the command is *not* morphed according to this line, and
+the next line is attempted.
 
-2.  To save column space, I print the short UUID on some reports.  I then want
-    to do stuff to that entry, using that UUID.  Sadly, taskwarrior insists on
-    the long uuid, which I don't have.
+Here's the previous example again, with a conditional this time.  The maximum
+brightness is now 59, which would have been even more cumbersome in the
+previous example (a max of 99 allowed us to cheat by testing number of digits
+instead of the actual value!).
 
-    But I can get *all* the UUIDs from `task _uuids` and grep for my short
-    one.  (There won't be any duplicates, I am confident).
+    dim     dim$        dim 5
+    dim     dim (\d+)$  xbacklight -set %1         %1 >= 3 and %1 <= 59
+    dim     dim %%      @echo need number [3-59]
 
-    So... `tw $SHORT_UUID` just expands the short UUID into the long one
-    (internally) and runs the command!
+What's happening here is, when line 2 is encountered, the pattern is matched,
+then the condition, since it exists, is evaluated before allowing the command
+to be morphed into `xbacklight ...`.  If the condition evaluates to false, the
+command is NOT morphed; it remains "dim (something)" instead of becoming
+"xbacklight -set (something)", and thus matches the next line's pattern.
 
-    rc lines:
+# more examples
 
-        tw      tw ([0-9a-f]{8})$               task `task _uuids | grep %1` info
-        tw      tw ([0-9a-f]{8}) %%             tw `task _uuids | grep %1` %2
+## shallow recursion -- multi grep {#mgrep}
 
-3.  I often want to change both the due date **and** the wait date to the same
-    value.  (The wait date in taskwarrior is the date after which the task
-    will show up as "pending"; before that you won't even see it on "pending"
-    reports).
+I often have to do something like this:
 
-    Nothing in task or in zsh's alias mechanism allows this.  You can do
-    something really complicated by creating a task alias (that's inside
-    `~/.taskrc`, not `~/.zshrc` or such) that defines a function and then
-    calls the function all in one go, but it's hard on eyes.  Even for a perl
-    programmer ;-)
+    ... | grep foo | grep -v bar | grep baz
 
-    So just say `task mod 92 ::2weeks` (for example).  The double colon is
-    expanded by this rc line:
+The following rc lines allow me to just say `... | mgrep foo -bar baz`:
 
-        tw      tw %% ::%       task %1 due:%2 wait:%2
+    mgrep          mgrep % %%         mgrep %1 | __ mgrep %2
+    mgrep          mgrep -%           @grep -v %1
+    mgrep          mgrep %            @grep    %1
 
-    Problem solved.
+With a little extra, you can also allow "-i" (ignore case option):
 
-4.  Sometimes you do something in a directory and it creates a file.  You want
-    to do stuff with this file.  And it often has (or may have) an odd name
-    and you have to at least remember the first few characters to tab-complete
-    it.
+    mgrep          mgrep -i           mgrep                     $ENV{MG_I)="-i"
+    mgrep          mgrep % %%         mgrep %1 | __ mgrep %2
+    mgrep          mgrep -%           @grep $MG_I -v %1
+    mgrep          mgrep %            @grep $MG_I %1
 
-    So here:
+Note the first line specifies a "morph" that removes the "-i", and the
+"condition" has a side-effect of setting the environment variable, which is
+used later in the grep command invocations.
 
-        youtube-dl <some URL>
-        __ vlc LF
+(I wouldn't go too deep with this; each word adds one process to the pipe, but
+for most human needs, it should do fine!)
 
-    and off it goes!
+## the unmatched part of the command line
 
-    I'm sure zsh has some way to do this, but remember I need it in places I
-    don't have zsh and can't (be bothered to) install it.
+Here's one that lets me edit a base set of files (i.e., those in
+`~/.gitolite/conf`) if I run just the command, but if I add "-a" it lets me
+edit the base set *and* some other files (i.e., gl-conf files in first level
+repositories):
 
-    Even better, this picks up the 3rd most recently updated file:
+    vconf       vconf -a$       vconf $HOME/repositories/*.git/gl-conf
+    vconf       vconf           vconf $HOME/.gitolite/conf/*
+    vconf       vconf           ${EDITOR:-vim}
 
-        __ some-command LF3
+How does this work?  At each stage, only the part of the current command that
+matches the pattern is morphed.  Anything left over (unmatched) from the old
+command remains, unchanged, after the morphed part.  Here's what the command
+looks like after each line, starting from 'vconf -a'.
 
-    and so on for any single digit.  The rc lines are:
+    1:  vconf $HOME/repositories/*.git/gl-conf
+    2:  vconf $HOME/.gitolite/conf/* $HOME/repositories/*.git/gl-conf
+        ^--- matched/morphed ------^ ^-- unmatched (carried over) --^
+    3:    vim $HOME/.gitolite/conf/* $HOME/repositories/*.git/gl-conf
 
-        ALL     %% LF           %1 ./LF1
-        ALL     %% LF(\d)       %1 ./LF%2
-        ALL     %% (\D\S*)/LF   %1 %2/LF1
-        ALL     %% %/LF(\d)     %1 %2/`cd %2 ;ls -Atrc|tail -%3|head -1`
+## argument parsing the easy way
 
-    This is another example of alias lines chaining.  What's happening is that
-    each rule gets the command closer to some canonical form, and the last
-    rule works only on the canonical form.
+Here's our final example, showing several tricks.
 
-    (Similarly, I have BN as an alias for the basename of the current
-    directory).
+What it does is allow me to start youtube downloads using either the URL
+itself, or the name of a file that was (maybe partially) downloaded, since the
+file name contains the youtube "id" (that random 10-digit string you see in
+youtube URLs).
 
-5.  I often create directories with today's date, in either YYYY-MM or
-    YYYY-MM-DD form.  The folders are *never* called just "2013-03", but
-    rather, "2013-03-RSP-review" or some such thing.
+    yd      yd                      yd                      chdir "$ENV{HOME}/yt"
+    yd      yd http%                _yd http%1
+    yd      yd %.part               yd %1
+    yd      yd .*-(\S{10,})\.\w+$   _yd https://www.youtube.com/watch?v=%1
+    _yd     _yd                     youtube-dl
 
-    What I would like to do is simply `mkdir Ym-RSP-review`.  Zsh's global
-    aliases won't work on this -- they treat that whole thing as one token and
-    it doesn't match any alias.
+Points to note:
 
-    But with these rc lines:
+*   the first line has the 2nd field equal to the 3rd field, so it doesn't
+    matter if the command morphs in this line or not.  Therefore, the value of
+    the conditional expression is irrelevant; we're only using it for its
+    side-effect: in this case, the 'chdir'.
 
-        ALL     %% Ym-%         %1 `date +%Y-%m-`%2
-        ALL     %% Ymd-%        %1 `date +%Y-%m-%d-`%2
+*   if an argument starting with http is seen, the second line *changes the
+    command name* from `yd` to `_yd`.  This is a clever way to *bypass* all
+    other lines matching the 'yd' command.
 
-    it's trivial.
+*   a trailing ".part" is removed from the argument in the 3rd line.  This is
+    the kind of thing where the idea of step-by-step morphing a command line
+    becomes really intuitive.
 
-    You might argue that this would prevent me from actually having a file
-    whose name starts with "Ym-" or "Ymd-".  That is correct.  I'm fine with
-    that, but if you're not, you could always establish a leader character
-    (I suggest the comma) before the "Y".  Surely you won't be needing an
-    actual file called `,Ym-foo` right?
+*   and finally, the 4th line gets the juicy bit (the 10-character youtube
+    "id") from the file name, constructs a URL from it, and (like line 2)
+    changes the command name to `_yd`.  In spirit, this isn't much different
+    from line 3, just that the expression is a bit more complex.
 
-That's about it.
+Why couldn't we remove line 5 and simply use 'youtube-dl' in lines 2 and 4?
+We could, but if we want to add any default arguments etc., later, we'd need
+to add them in two places.
 
-# invocation
+Try that in any shell :)
 
-You can invoke `__` in 3 ways:
+# details
+
+## rc files {#rcfiles}
+
+The program picks up rc files in the following order.  The combined content of
+all of them is what is used:
+
+1.  `.__rc` from the same directory (typically something in the PATH) where
+    `__` itself is installed.
+2.  `.__rc` in the current directory, if it exists.
+3.  `.__rc` in its parent directory, if it exists, and so on for each
+    successive parent directory, all the way upto \$HOME.
+
+Note that this allows directory-specific aliases -- aliases that would only
+apply in a specific directory (or underneath it).  For example, I have several
+aliases that are really only applicable to my gitolite development and testing
+tasks, so they live in a `.__rc` file in the gitolite source directory.
+
+SECURITY NOTE: If your current directory is not \$HOME (say your PWD is /tmp
+or something), then this will behave as if you were in \$HOME (i.e., it will
+*never* look for rc files outside your home directory tree).
+
+## rc line syntax and how it all works {#syn}
+
+Each line in the rc file(s) has at least three fields, with an optional fourth
+field, as described below.  Fields are separated by HARD TABs.  @@gray(PLEASE
+NOTE that you should avoid comments on the same line; put comments on their
+own lines please!)@@
+
+At the beginning, the program has a notion of the **current command** being
+processed.  As each rc line is read, this current command may change ("morph")
+into something else.  When *all* the lines have been read and processed,
+whatever remains is executed as a shell command.
+
+Each rc line has 4 fields.
+
+1.  The first field is used to match the first word of the current command.
+    If it doesn't match, that rc line is skipped.  This is an optimisation to
+    speed up things a bit, since you have all sorts of unrelated aliases in
+    the same file.
+
+    Also, if this field contains the special word "ALL", then any command
+    matches.
+
+2.  The "from" field is a pattern that the current command is matched against.
+    If it doesn't match, the rc line is skipped.  The field is a perl regex,
+    and may contain parenthesised sub-expressions.  @@gray((Any regular
+    expression tutorial will help you with that if needed))@@.
+
+    It usually contains one or more `%` and/or `%%` signs.  A `%` matches the
+    "rest of the word", while `%%` is "rest of the line".  They are both
+    considered parenthesised sub-expressions; you don't have to put them in
+    parentheses.
+
+    The pattern need not match the entire current command unless it ends with
+    a `$`.  Only the part of the "current command" that matches this pattern
+    will be morphed.  The rest will stay as-is.  (There's an example of this
+    in the "showpiece examples" section above.)
+
+3.  The "to" field is the new (morphed) command.  Variables like %1 and %2
+    etc.  are replaced by the corresponding matched subgroups in the regex
+    match in the previous step.
+
+    This only happens if there is either no "cond" field (see next bullet), or
+    there is one and it evaluates to true.  If a "cond" field exists and
+    evaluates to false, the morphing is skipped and the next rc line is read.
+
+    As you can see, this means a command may potentially be changed multiple
+    times before reaching the end of all the rc lines and being executed.
+
+4.  The "cond" field is *optional* code that is evaluated as a perl
+    expression.  It may also contain variables like %1 and %2, which are
+    replaced by corresponding matched subgroups, before the expression is
+    evaluated.
+
+    The expression is evaluated in the context of the main `__` program, and
+    it can use global and environment variables to save data and reuse it in
+    later steps.  It can also do persistent actions like changing the current
+    directory, etc.
+
+## invocation {#inv}
+
+You can invoke `__` in the following ways:
 
 1.  for commands that you use frequently, setup aliases like this:
 
@@ -202,56 +322,18 @@ You can invoke `__` in 3 ways:
     create new aliases by adding them directly into the rc lines for the
     `__` program.
 
-    See examples 1, 2, and 3 below, which show that I use "tw" for "task".
-    There is actually no command, alias, or function called "tw" on the
-    system, but the "unknown command helper" function detects that and does
-    some magic. See appendix 1 for the code for this function.
+    When you run the command, the shell runs the "unknown command helper"
+    (since it can't find such a command, alias, or function), which then runs
+    `__` appripriately.  See appendix 1 for the code for this function.
 
     It's worth repeating that this makes it possible to use pretty much
     **anything** as an implicit alias simply by putting it in this file.
     However, should a real command of that name ever get installed by some
     means, you may have a bit of a confusing time until you realise what
-    happened.  At that point, the best thing is to go to method 1.
+    happened.  At that point, the best thing is to go to method 1 or 2,
+    depending on how frequent your use of it is.
 
-# rc files
-
-The program picks up rc files in the following order.  The combined content of
-all of them is what is used:
-
-1.  `.__rc` from the same directory (typically something in the PATH) where
-    `__` itself is installed.
-2.  `.__rc` in the current directory, if it exists.
-3.  `.__rc` in its parent directory, if it exists, and so on for each
-    successive parent directory, all the way upto \$HOME.
-
-NOTE: If your current directory is not \$HOME (say your PWD is /tmp or
-something), then this will behave as if you were in \$HOME (i.e., it will never
-look for rc files outside your home directory tree).
-
-# rc syntax
-
-Each line has the following fields, with a hard tab (actual tab character, not
-just spaces) between them: command, from, to, condition.
-
-1.  The "command" is used to match the first word of the user-supplied
-    command. If it doesn't match, that rc line is skipped.
-
-    You could consider this a first level pattern match.
-
-2.  The "from" is a pattern that the current command is matched against.  If
-    it doesn't match, the rc line is skipped.
-
-    This variable is considered to be a perl regex, and is matched against the
-    user supplied command.
-
-3.  The "to" is the new command.  Variables like %1 and %2 etc are replaced by
-    the corresponding matched subgroups in the regex match in the previous
-    step.
-
-4.  The "cond" is some extra code that is evaluated in perl.  If it exists, it
-    must return true, otherwise the rc line is skipped.
-
-# installation
+## installation
 
 Just put it in your path somewhere.
 
