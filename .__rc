@@ -104,7 +104,7 @@ vg	vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 # ---- text handling: mgrep, InPlace, field, hdt, hd
 
 ## mgrep:mgrep word list; grep multiple words, prefix with "-" to exclude.  Last word is colored
-mgrep	mgrep -i	mgrep	$ENV{MG_I)="-i"
+mgrep	mgrep -i	mgrep	$ENV{MG_I}="-i"
 mgrep	mgrep % %%	mgrep %1 | __ mgrep %2
 mgrep	mgrep -%	@grep $MG_I -v %1
 mgrep	mgrep %	@grep $MG_I --color %1

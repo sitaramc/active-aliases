@@ -146,7 +146,7 @@ The following rc lines allow me to just say `... | mgrep foo -bar baz`:
 
 With a little extra, you can also allow "-i" (ignore case option):
 
-    mgrep          mgrep -i           mgrep                     $ENV{MG_I)="-i"
+    mgrep          mgrep -i           mgrep                     $ENV{MG_I}="-i"
     mgrep          mgrep % %%         mgrep %1 | __ mgrep %2
     mgrep          mgrep -%           @grep $MG_I -v %1
     mgrep          mgrep %            @grep $MG_I %1
