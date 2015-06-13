@@ -103,22 +103,11 @@ vg	vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 
 # ---- text handling: mgrep, InPlace, field, hdt, hd
 
-## mgrep:mgrep word list; grep multiple words, prefix with "-" to exclude.  First word is colored
-mg	mg	mgrep
-mgrep	mgrep	mgrep	$::I=""
-mgrep	mgrep -i	mgrep	$::I="-i"
-mgrep	mgrep %$	mgrep %1 .
-mgrep	mgrep % %%	@true	my $f= \
-                                                join("|", \
-                                                    map \
-                                                        { s/^-// ? "grep -v $::I $_" : "grep $::I $_" } \
-                                                            split(' ', "%2") \
-                                                ); \
-                                                $f.="|grep $::I --color %1"; \
-                                                system($f); \
-                                                1
-mgrep	mgrep %%	@echo usage: series of words to grep on
-mgrep	mgrep	@echo usage: series of words to grep on
+## mgrep:mgrep word list; grep multiple words, prefix with "-" to exclude.  Last word is colored
+mgrep	mgrep -i	mgrep	$ENV{MG_I)="-i"
+mgrep	mgrep % %%	mgrep %1 | __ mgrep %2
+mgrep	mgrep -%	@grep $MG_I -v %1
+mgrep	mgrep %	@grep $MG_I --color %1
 
 ## InPlace:(NO WARNINGS, NO SECOND CHANCES) frompatt topatt filelist...
 InPlace	InPlace -i % %	perl -w -0777 -pi -e "s(%1)(%2)gi"
