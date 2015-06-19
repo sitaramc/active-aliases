@@ -3,6 +3,8 @@ use strict;
 use warnings;
 use 5.10.0;
 
+# ----------------------------------------------------------------------
+
 # active aliases -- see http://gitolite.com/active-aliases (or __.mkd in the
 # source repo) for documentation
 
@@ -168,3 +170,33 @@ sub _commands {
 
     exit 0;
 }
+
+# ----------------------------------------------------------------------
+
+sub _open {
+    open( my $fh, $_[0], $_[1] ) or die "open $_[1] failed: $!";
+    return $fh;
+}
+
+sub _print {
+    my ( $file, @text ) = @_;
+    my $fh = _open( ">", "$file.$$" );
+    print $fh @text;
+    close($fh) or die "close $file failed: $! at ", (caller)[1], " line ", (caller)[2];
+    my $oldmode = ( ( stat $file )[2] );
+    rename "$file.$$", $file;
+    chmod $oldmode, $file if $oldmode;
+}
+
+sub append {
+    my ( $file, @text ) = @_;
+    _print( $file, slurp($file), @text );
+}
+
+sub slurp {
+    return unless defined wantarray;
+    local $/ = undef unless wantarray;
+    my $fh = _open( "<", $_[0] );
+    return <$fh>;
+}
+
