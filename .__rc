@@ -101,7 +101,7 @@ vg	vg i %%	vg -i %1
 vg	vg w %%	vg -w %1
 vg	vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 
-# ---- text handling: mgrep, InPlace, field, hdt, hd
+# ---- text handling: mgrep, InPlace, field, hdt, hd, tc (un/fold)
 
 ## mgrep:mgrep word list; grep multiple words, prefix with "-" to exclude.  Last word is colored
 mgrep	mgrep -i	mgrep	$ENV{MG_I}="-i"
@@ -119,6 +119,12 @@ field	field (\d+)	awk '{print $%1}'
 hdt	hdt	perl -pe 's/^\d{5,}(\.\d+)?/localtime $&/e'
 ## hd:|hd; hexdump using od options
 hd	hd	od -Ax -tx1z -v
+
+## tc:tc fold|unfold
+# I have a lot of files where I use a leading tab as a continuation marker
+# (i.e., 'grep' etc should look at those lines as one logical line)
+tc	tc fold$	@perl -0777 -pe "s/\n\t/<x0D>/g"
+tc	tc unfold$	@perl -pe 's/<x0D>/\n\t/g'
 
 # ---- file handing: ch, lf
 
