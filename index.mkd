@@ -39,16 +39,16 @@ Here's a *very small* example.  Notice how, if you give it just 'glg', it
 pretends you gave it 'glg 5' and proceeds from there:
 
     # show last N (default 5) git commit subject lines
-    glg         glg$            glg 5
-    glg         glg (\d+)$      git log --oneline -%1 | less -R -F
+    glg$            glg 5
+    glg (\d+)$      git log --oneline -%1 | less -R -F
 
 Here is one more really simple one, where you can guess not only what `ch r
 /tmp/foo` should do, but also that a more elegant way to do this simply cannot
 exist :-)
 
-    ch          ch r            chmod -R go+rX
-    ch          ch w            chmod u+w
-    ch          ch x            chmod +x
+    ch r            chmod -R go+rX
+    ch w            chmod u+w
+    ch x            chmod +x
 
 # features/concepts
 
@@ -63,10 +63,10 @@ to set predefined CPU frequency governors, or for example, 'cg powersave'
 etc., for other governors without their own shortcut word.  In addition, if I
 type just 'cg', I get 'cg cool'.
 
-    cg          cg$             cg cool
-    cg          cg cool$        cg ondemand
-    cg          cg fast$        cg performance
-    cg          cg              cpupower -c all frequency-set -g
+    cg$             cg cool
+    cg cool$        cg ondemand
+    cg fast$        cg performance
+    cg              cpupower -c all frequency-set -g
 
 Actually, 'cg' morphs to 'cg cool', then 'cg cool' morphs to 'cg ondemand',
 and *that* finally morphs to 'cpupower -c all frequency-set -g ondemand'.
@@ -78,12 +78,12 @@ want to type the minimum number of characters needed, but I can never remember
 if it should be "ac" or "ca", so I want to allow both.  This gives me six
 possible arguments to my new "enc" command:
 
-    enc         enc ca          enc c -a
-    enc         enc ac          enc c -a
-    enc         enc ra          enc r -a
-    enc         enc ar          enc r -a
-    enc         enc c           gpg -c --cipher-algo AES256
-    enc         enc r           gpg -e -r sitaramc@gmail.com
+    enc ca          enc c -a
+    enc ac          enc c -a
+    enc ra          enc r -a
+    enc ar          enc r -a
+    enc c           gpg -c --cipher-algo AES256
+    enc r           gpg -e -r sitaramc@gmail.com
 
 When you type in "enc ca file", the first line converts it to "enc c -a file".
 Then the next 3 lines don't match, and the 5th line converts it to "gpg -c
@@ -99,11 +99,11 @@ readable.
 Here's a bit of a tough one:
 
     # set screen brightness: default 5, min 3 max 99.
-    dim     dim$                    dim 5
-    dim     dim [0-2]$              @echo need number [3-99]
-    dim     dim [1-9][0-9][0-9]+$   @echo need number [3-99]
-    dim     dim (\d+)$              @xbacklight -set %1
-    dim     dim %%                  @echo need number [3-99]
+    dim$                    dim 5
+    dim [0-2]$              @echo need number [3-99]
+    dim [1-9][0-9][0-9]+$   @echo need number [3-99]
+    dim (\d+)$              @xbacklight -set %1
+    dim %%                  @echo need number [3-99]
 
 @@box-r(NOTE: a bit of regex knowledge assumed here, like capture groups.
 Also, see the [rc line syntax][syn] section later for what %% means.)@@
@@ -111,7 +111,7 @@ Also, see the [rc line syntax][syn] section later for what %% means.)@@
 This is better than writing it in shell, but not *much* better; some of the
 rough edges are showing up.
 
-To help with that, we define a fourth field, which is a **condition** to be
+To help with that, we define a third field, which is a **condition** to be
 met.  If it fails, the command is *not* morphed according to this line, and
 the next line is attempted.
 
@@ -120,9 +120,9 @@ brightness is now 59, which would have been even more cumbersome in the
 previous example (a max of 99 allowed us to cheat by testing number of digits
 instead of the actual value!).
 
-    dim     dim$        dim 5
-    dim     dim (\d+)$  xbacklight -set %1         %1 >= 3 and %1 <= 59
-    dim     dim %%      @echo need number [3-59]
+    dim$        dim 5
+    dim (\d+)$  xbacklight -set %1         %1 >= 3 and %1 <= 59
+    dim %%      @echo need number [3-59]
 
 What's happening here is, when line 2 is encountered, the pattern is matched,
 then the condition, since it exists, is evaluated before allowing the command
@@ -140,16 +140,16 @@ I often have to do something like this:
 
 The following rc lines allow me to just say `... | mgrep foo -bar baz`:
 
-    mgrep          mgrep % %%         mgrep %1 | __ mgrep %2
-    mgrep          mgrep -%           @grep -v %1
-    mgrep          mgrep %            @grep    %1
+    mgrep % %%         mgrep %1 | __ mgrep %2
+    mgrep -%           @grep -v %1
+    mgrep %            @grep    %1
 
 With a little extra, you can also allow "-i" (ignore case option):
 
-    mgrep          mgrep -i           mgrep                     $ENV{MG_I}="-i"
-    mgrep          mgrep % %%         mgrep %1 | __ mgrep %2
-    mgrep          mgrep -%           @grep $MG_I -v %1
-    mgrep          mgrep %            @grep $MG_I %1
+    mgrep -i           mgrep                     $ENV{MG_I}="-i"
+    mgrep % %%         mgrep %1 | __ mgrep %2
+    mgrep -%           @grep $MG_I -v %1
+    mgrep %            @grep $MG_I %1
 
 Note the first line specifies a "morph" that removes the "-i", and the
 "condition" has a side-effect of setting the environment variable, which is
@@ -165,9 +165,9 @@ Here's one that lets me edit a base set of files (i.e., those in
 edit the base set *and* some other files (i.e., gl-conf files in first level
 repositories):
 
-    vconf       vconf -a$       vconf $HOME/repositories/*.git/gl-conf
-    vconf       vconf           vconf $HOME/.gitolite/conf/*
-    vconf       vconf           ${EDITOR:-vim}
+    vconf -a$       vconf $HOME/repositories/*.git/gl-conf
+    vconf           vconf $HOME/.gitolite/conf/*
+    vconf           ${EDITOR:-vim}
 
 How does this work?  At each stage, only the part of the current command that
 matches the pattern is morphed.  Anything left over (unmatched) from the old
@@ -188,15 +188,15 @@ itself, or the name of a file that was (maybe partially) downloaded, since the
 file name contains the youtube "id" (that random 10-digit string you see in
 youtube URLs).
 
-    yd      yd                      yd                      chdir "$ENV{HOME}/yt"
-    yd      yd http%                _yd http%1
-    yd      yd %.part               yd %1
-    yd      yd .*-(\S{10,})\.\w+$   _yd https://www.youtube.com/watch?v=%1
-    _yd     _yd                     youtube-dl
+    yd                      yd                      chdir "$ENV{HOME}/yt"
+    yd http%                _yd http%1
+    yd %.part               yd %1
+    yd .*-(\S{10,})\.\w+$   _yd https://www.youtube.com/watch?v=%1
+    _yd                     youtube-dl
 
 Points to note:
 
-*   the first line has the 2nd field equal to the 3rd field, so it doesn't
+*   the first line has the 1st field equal to the 2nd field, so it doesn't
     matter if the command morphs in this line or not.  Therefore, the value of
     the conditional expression is irrelevant; we're only using it for its
     side-effect: in this case, the 'chdir'.
@@ -244,7 +244,7 @@ or something), then this will behave as if you were in \$HOME (i.e., it will
 
 ## rc line syntax and how it all works {#syn}
 
-Each line in the rc file(s) has at least three fields, with an optional fourth
+Each line in the rc file(s) has at least two fields, with an optional third
 field, as described below.  Fields are separated by HARD TABs.  @@gray(PLEASE
 NOTE that you should avoid comments on the same line; put comments on their
 own lines please!)@@
@@ -254,20 +254,16 @@ processed.  As each rc line is read, this current command may change ("morph")
 into something else.  When *all* the lines have been read and processed,
 whatever remains is executed as a shell command.
 
-Each rc line has 4 fields.
+Each rc line has 3 fields.
 
-1.  The first field is used to match the first word of the current command.
-    If it doesn't match, that rc line is skipped.  This is an optimisation to
-    speed up things a bit, since you have all sorts of unrelated aliases in
-    the same file.
-
-    Also, if this field contains the special word "ALL", then any command
-    matches.
-
-2.  The "from" field is a pattern that the current command is matched against.
+1.  The "from" field is a pattern that the current command is matched against.
     If it doesn't match, the rc line is skipped.  The field is a perl regex,
     and may contain parenthesised sub-expressions.  @@gray((Any regular
     expression tutorial will help you with that if needed))@@.
+
+    @@gray(If this field start with "ALL", followed by at least one space,
+    then the "ALL" and the spaces after it are removed, and any command
+    matches.)@@
 
     It usually contains one or more `%` and/or `%%` signs.  A `%` matches the
     "rest of the word", while `%%` is "rest of the line".  They are both

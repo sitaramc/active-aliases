@@ -44,9 +44,7 @@ while (<>) {
     if ($cont) { s/^\s+//; $_ = $cont . $_; $cont = '' }
     if (/\\$/) { s/\\$//; $cont = $_; next }
 
-    my ( $cmd, $pattern, $repl, $cond ) = split /\t/;
-    next unless $cmd eq $cmd_name or $cmd eq 'ALL';
-    # 'cmd' field eq 'ALL' means apply this transform to ANY incoming command
+    my ( $pattern, $repl, $cond ) = split /\t/;
     $cond ||= '';    # avoid undef warnings later
 
     my $f0 = "$.\t$pattern" if $ENV{D};
