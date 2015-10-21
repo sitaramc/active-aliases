@@ -220,10 +220,12 @@ crypdf	crypdf e % %$	qpdf --empty --pages %1 -- \
 ## PWGEN
 PWGEN	PWGEN	cat /usr/share/dict/words|egrep '^.{3,6}$'|shuf 2>/dev/null|head -1000|egrep '^[a-z]*$'|column|head
 
-# ---- misc (dot)
+# ---- misc (dot, mix)
 
 ## dot:dot gv-file [png-file] (defaults to ~/junk.png)
 dot	dot %$	dot %1 ~/junk.png
 dot	dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
+meb	meb	MIX_ENV=prod mix escript.build --force
+mt	mt	mix test && git log -1 --format='%h %ai %s' >> .git/test.log
 
 # vim: ts=16:
