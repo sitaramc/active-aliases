@@ -49,7 +49,7 @@ for my $r (@rules) {
     $cond ||= '';    # avoid undef warnings later
     chomp($cond);
 
-    my $f0 = "p=$pattern" if $ENV{D};
+    my $f0 = "<<<\np=$pattern\nfc=$fullcmd\n>>>" if $ENV{D};
     # for debug printing only; not needed otherwise
 
     # replace %% and % in "pattern" string with actual regex sequences
