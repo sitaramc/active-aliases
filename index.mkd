@@ -1,7 +1,4 @@
-<!--
-    options: toc
-    to: html-N
--->
+<!-- options: toc to=html-N -->
 
 % active aliases
 
@@ -26,29 +23,44 @@ For example, I want `ch r ...` to expand to `chmod -R go+rX ...`, but `gpg r
 ...` to expand to `gpg -r sitaramc@gmail.com ...`, even though in both cases
 the word being expanded is the same (the letter 'r').
 
-@@box-r(Although you can't see it here, the rc file is TAB delimited; so just
-pretend you can see the hard tabs where there are several space characters!)@@
-
 What I came up with is a way to take a command, and keep morphing it into
 something else, possibly in multiple steps, and execute whatever comes out at
 the end.  At each step, the replacement becomes the new command, which may be
-quite different from the old one.  (Note: until you read the [syntax][syn]
-section, just ignore the first column!)
+quite different from the old one.
 
 Here's a *very small* example.  Notice how, if you give it just 'glg', it
 pretends you gave it 'glg 5' and proceeds from there:
 
     # show last N (default 5) git commit subject lines
-    glg$            glg 5
-    glg (\d+)$      git log --oneline -%1 | less -R -F
+    glg$
+        glg 5
+    glg (\d+)$
+        git log --oneline -%1 | less -R -F
 
 Here is one more really simple one, where you can guess not only what `ch r
 /tmp/foo` should do, but also that a more elegant way to do this simply cannot
 exist :-)
 
-    ch r            chmod -R go+rX
-    ch w            chmod u+w
-    ch x            chmod +x
+    ch r
+        chmod -R go+rX
+    ch w
+        chmod u+w
+    ch x
+        chmod +x
+
+## an important note about the syntax
+
+As of 2017-01-26, the syntax has been changed somewhat.  There's a whole
+section devoted to syntax later, but note that the above can also, for
+convenience, be written as:
+
+    ch r    chmod -R go+rX
+    ch w    chmod u+w
+    ch x    chmod +x
+
+Except it needs a **hard tab** just between the comand and the replacement.
+We will use this syntax where convenient, please assume the hard tabs are
+there!
 
 # features/concepts
 
@@ -121,14 +133,16 @@ previous example (a max of 99 allowed us to cheat by testing number of digits
 instead of the actual value!).
 
     dim$        dim 5
-    dim (\d+)$  xbacklight -set %1         %1 >= 3 and %1 <= 59
+    dim (\d+)$  xbacklight -set %1
+        ?   %1 >= 3 and %1 <= 59
     dim %%      @echo need number [3-59]
 
 What's happening here is, when line 2 is encountered, the pattern is matched,
-then the condition, since it exists, is evaluated before allowing the command
-to be morphed into `xbacklight ...`.  If the condition evaluates to false, the
-command is NOT morphed; it remains "dim (something)" instead of becoming
-"xbacklight -set (something)", and thus matches the next line's pattern.
+then the condition given on the next line is evaluated before allowing the
+command to be morphed into `xbacklight ...`.  If the condition evaluates to
+false, the command is NOT morphed; it remains "dim (something)" instead of
+becoming "xbacklight -set (something)", and thus matches the next line's
+pattern.
 
 # more examples
 
@@ -144,7 +158,7 @@ The following rc lines allow me to just say `... | mgrep foo -bar baz`:
     mgrep -%           @grep -v %1
     mgrep %            @grep    %1
 
-With a little extra, you can also allow "-i" (ignore case option):
+With a little extra, you can also allow an explicit "-i" (ignore case option):
 
     mgrep -i           mgrep                     $ENV{MG_I}="-i"
     mgrep % %%         mgrep %1 | __ mgrep %2
@@ -155,8 +169,23 @@ Note the first line specifies a "morph" that removes the "-i", and the
 "condition" has a side-effect of setting the environment variable, which is
 used later in the grep command invocations.
 
-(I wouldn't go too deep with this; each word adds one process to the pipe, but
-for most human needs, it should do fine!)
+You can also get "smartcase" (a nice feature where, if the pattern has any
+uppercase letters, it is considered case-sensitive, but if it is all
+lowercase, then a "-i" is implied):
+
+    mgrep % %%         mgrep %1 | __ mgrep %2
+    mgrep              mgrep
+        ?   "%1" !~ /[A-Z]/ and  $ENV{MG_I}="-i"
+    mgrep -%           @grep $MG_I -v %1
+    mgrep %            @grep $MG_I %1
+
+Here, we're using the "condition" field in the second rule to set an
+environment variable as a side effect, and using that later.  The actual
+command does not change at all, since the replacement is the same as the
+pattern.
+
+(I wouldn't go too deep; each word adds one process to the pipe, but for most
+human needs, it should do fine!)
 
 ## the unmatched part of the command line
 
@@ -188,7 +217,8 @@ itself, or the name of a file that was (maybe partially) downloaded, since the
 file name contains the youtube "id" (that random 10-digit string you see in
 youtube URLs).
 
-    yd                      yd                      chdir "$ENV{HOME}/yt"
+    yd                      yd
+        ?   chdir "$ENV{HOME}/yt"
     yd http%                _yd http%1
     yd %.part               yd %1
     yd .*-(\S{10,})\.\w+$   _yd https://www.youtube.com/watch?v=%1
@@ -196,25 +226,24 @@ youtube URLs).
 
 Points to note:
 
-*   the first line has the 1st field equal to the 2nd field, so it doesn't
-    matter if the command morphs in this line or not.  Therefore, the value of
-    the conditional expression is irrelevant; we're only using it for its
-    side-effect: in this case, the 'chdir'.
+*   the first rule again shows a side-effect being used (change directory);
+    notice that the replacement is the same as the pattern so the actual
+    command does not change.
 
-*   if an argument starting with http is seen, the second line *changes the
+*   if an argument starting with http is seen, the second rule *changes the
     command name* from `yd` to `_yd`.  This is a clever way to *bypass* all
-    other lines matching the 'yd' command.
+    other rules matching the 'yd' command.
 
-*   a trailing ".part" is removed from the argument in the 3rd line.  This is
-    the kind of thing where the idea of step-by-step morphing a command line
+*   a trailing ".part" is removed from the argument in the 3rd rule.  This is
+    the kind of thing where the idea of step-by-step morphing a command rule
     becomes really intuitive.
 
-*   and finally, the 4th line gets the juicy bit (the 10-character youtube
-    "id") from the file name, constructs a URL from it, and (like line 2)
+*   and finally, the 4th rule gets the juicy bit (the 10-character youtube
+    "id") from the file name, constructs a URL from it, and (like rule 2)
     changes the command name to `_yd`.  In spirit, this isn't much different
-    from line 3, just that the expression is a bit more complex.
+    from rule 3, just that the expression is a bit more complex.
 
-Why couldn't we remove line 5 and simply use 'youtube-dl' in lines 2 and 4?
+Why couldn't we remove rule 5 and simply use 'youtube-dl' in rules 2 and 4?
 We could, but if we want to add any default arguments etc., later, we'd need
 to add them in two places.
 
@@ -242,51 +271,62 @@ SECURITY NOTE: If your current directory is not \$HOME (say your PWD is /tmp
 or something), then this will behave as if you were in \$HOME (i.e., it will
 *never* look for rc files outside your home directory tree).
 
-## rc line syntax and how it all works {#syn}
+## rc rule syntax and how it all works {#syn}
 
-Each line in the rc file(s) has at least two fields, with an optional third
-field, as described below.  Fields are separated by HARD TABs.  @@gray(PLEASE
-NOTE that you should avoid comments on the same line; put comments on their
-own lines please!)@@
+Each rule has 3 parts: a pattern, a replacement, and an optional "condition".
+
+The correct syntax for each rule is:
+
+    pattern
+        replacement command (shell)
+        (optional: more lines of replacement command)
+        ...
+        ...
+        ?   condition code (perl)
+            (optional: more lines of condition code)
+
+If the patterns and replacements are short enough for comfortable editing, you
+can put them on the same line, using a **hard tab** as the delimitor.  This is
+what you see in most of the examples above.
+
+The condition code can also go in as (yet another) tab-delimited field if you
+wish, especially if the code is a short snippet.
 
 At the beginning, the program has a notion of the **current command** being
-processed.  As each rc line is read, this current command may change ("morph")
-into something else.  When *all* the lines have been read and processed,
-whatever remains is executed as a shell command.
+processed.  As each rc rule is read, this current command may be replaced by
+("morph into") something else.  When *all* the rules have been read and
+processed, whatever remains is executed as a shell command.
 
-Each rc line has 3 fields.
+Here's some more detail about the 3 fields:
 
-1.  The "from" field is a pattern that the current command is matched against.
-    If it doesn't match, the rc line is skipped.  The field is a perl regex,
-    and may contain parenthesised sub-expressions.  @@gray((Any regular
-    expression tutorial will help you with that if needed))@@.
+1.  The "pattern" is what the current command is matched against.  If it
+    doesn't match, the rule is skipped.  The field is a perl regex, and may
+    contain parenthesised sub-expressions.  @@gray((Any regular expression
+    tutorial will help you with that if needed))@@.
 
-    @@gray(If this field start with "ALL", followed by at least one space,
-    then the "ALL" and the spaces after it are removed, and any command
-    matches.)@@
-
-    It usually contains one or more `%` and/or `%%` signs.  A `%` matches the
-    "rest of the word", while `%%` is "rest of the line".  They are both
-    considered parenthesised sub-expressions; you don't have to put them in
-    parentheses.
+    It usually contains one or more `%` and/or `%%` signs.  A `%` matches a
+    series of non-space characters, while `%%` a series of any characters.
+    They are both considered parenthesised sub-expressions; you don't have to
+    put them in parentheses.
 
     The pattern need not match the entire current command unless it ends with
     a `$`.  Only the part of the "current command" that matches this pattern
     will be morphed.  The rest will stay as-is.  (There's an example of this
-    in the "showpiece examples" section above.)
+    above.)
 
-3.  The "to" field is the new (morphed) command.  Variables like %1 and %2
-    etc.  are replaced by the corresponding matched subgroups in the regex
-    match in the previous step.
+2.  The "replacement" field is the new (morphed) command.  Variables like %1
+    and %2 etc.  are replaced by the corresponding matched subgroups in the
+    regex match in the previous step.
 
-    This only happens if there is either no "cond" field (see next bullet), or
-    there is one and it evaluates to true.  If a "cond" field exists and
-    evaluates to false, the morphing is skipped and the next rc line is read.
+    This only happens if there is either no "condition" field (see next
+    bullet), or there is one and it evaluates to true.  If a "cond" field
+    exists and evaluates to false, the morphing is skipped and the next rule
+    is checked.
 
     As you can see, this means a command may potentially be changed multiple
     times before reaching the end of all the rc lines and being executed.
 
-4.  The "cond" field is *optional* code that is evaluated as a perl
+3.  The "condition" field is *optional* code that is evaluated as a perl
     expression.  It may also contain variables like %1 and %2, which are
     replaced by corresponding matched subgroups, before the expression is
     evaluated.
@@ -320,7 +360,7 @@ You can invoke `__` in the following ways:
 
     When you run the command, the shell runs the "unknown command helper"
     (since it can't find such a command, alias, or function), which then runs
-    `__` appripriately.  See appendix 1 for the code for this function.
+    `__` appropriately.  See appendix 1 for the code for this function.
 
     It's worth repeating that this makes it possible to use pretty much
     **anything** as an implicit alias simply by putting it in this file.

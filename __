@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use 5.10.0;
+use Data::Dumper;
 
 # ----------------------------------------------------------------------
 
@@ -18,6 +19,10 @@ use 5.10.0;
 
 use URI::Escape;
 
+# treat newlines embedded in arguments as argument separators.  This lets you
+# operate on "`find ...`" (note the double quotes).
+@ARGV = split("\n", join("\n", @ARGV));
+
 # we need the full command as one string, but we take care to escape the
 # spaces first, so we can split out arguments properly later
 my $fullcmd = join( " ", map { esc($_) } @ARGV );
@@ -32,22 +37,19 @@ my $cmd_name = shift;
 # Note: if $PWD is not within $HOME, we behave as if we were in $HOME (i.e.,
 # only the shipped rc file and the one in $HOME are used).
 
-@ARGV = get_rc_filenames();
-
 # completion help
 _commands() if $cmd_name eq '_commands';     # does not return
 
+my @rules = get_rules();
+
 my $cont = '';
-while (<>) {
-    chomp; next unless /\S/; next if /^\s*#/;
-
-    if ($cont) { s/^\s+//; $_ = $cont . $_; $cont = '' }
-    if (/\\$/) { s/\\$//; $cont = $_; next }
-
-    my ( $pattern, $repl, $cond ) = split /\t/;
+for my $r (@rules) {
+    my ( $pattern, $repl, $cond ) = @$r;
+    say STDERR Dumper [ 'patt/repl/cond', $pattern, $repl, $cond ] if $ENV{D} and $ENV{D} > 1;
     $cond ||= '';    # avoid undef warnings later
+    chomp($cond);
 
-    my $f0 = "$.\t$pattern" if $ENV{D};
+    my $f0 = "p=$pattern" if $ENV{D};
     # for debug printing only; not needed otherwise
 
     # replace %% and % in "pattern" string with actual regex sequences
@@ -94,16 +96,13 @@ while (<>) {
     ($cmd_name) = split ' ', $fullcmd;
 
     say STDERR "\t=\t$fullcmd" if $ENV{D};
-} continue {
-    if (eof) {
-        say STDERR "eof\t$ARGV" if $ENV{D};
-        close ARGV;
-    }
+
+    last if $fullcmd =~ m(^\@);     # slight optimisation
 }
 
 # unescape arguments for execution.  If an argument contains spaces, it is
 # quoted so the shell is happy.
-$fullcmd = join " ", map { quote_unesc($_) } split ' ', $fullcmd;
+$fullcmd = join " ", map { quote_unesc($_) } split / +/, $fullcmd;
 $fullcmd = "set -x; $fullcmd" unless $fullcmd =~ s(^\@)();
 no warnings;
 exec("$fullcmd") or die "__: $cmd_name: command not found\n";
@@ -159,8 +158,7 @@ sub get_rc_filenames {
     }
 
     if ($ENV{D}) {
-        require Data::Dumper;
-        say Data::Dumper::Dumper(\@ret);
+        say STDERR Dumper ['@ret:', @ret];
     }
 
     return @ret;
@@ -168,6 +166,7 @@ sub get_rc_filenames {
 
 sub _commands {
     my %commands;
+    @ARGV = get_rc_filenames();
     while (<>) {
         my $a = $ARGV; $a =~ s(^$ENV{HOME}/)(~/); $a =~ s(/?\.__rc$)();
         next unless s/^## //;
@@ -178,6 +177,30 @@ sub _commands {
     }
 
     exit 0;
+}
+
+sub get_rules {
+    my @rules;
+    @ARGV = get_rc_filenames();
+
+    my $raw = join "", grep { /\S/ } grep { ! /^\s*#/ } <>;
+    ## ?? $raw =~ s/^(?=\S)/\n/gm;    # add a blank line
+
+    # backward compat to old syntax (except backslash-line-continuation)
+    $raw =~ s/^(\S.*)\t(\S.*)\t(\S.*)/$1\n    $2\n    ?   $3/gm;
+    $raw =~ s/^(\S.*)\t(\S.*)/$1\n    $2/gm;
+
+    # this is a pretty rigid structure
+    while ($raw =~ m(^(\S.*(\n    .*)*))gm) {
+        my $p = $1;
+        my ($r, $c);
+        $c = $1 if $p =~ s(\n    \?   (.*))()s;
+        $r = $1 if $p =~ s(\n    (\S.*))()s;
+        die unless $r;  # 'repl' mandatory, 'cond' is not
+        push @rules, [$p, $r, $c];
+    }
+
+    return @rules;
 }
 
 # ----------------------------------------------------------------------

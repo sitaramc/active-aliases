@@ -1,42 +1,20 @@
-### other ideas from http://grml.org/zsh/zsh-lovers.html
-###
-### alias -g CA='|& cat -A'
-###     ... similarly for less, egrep, and variants ...
-### alias -g NUL="> /dev/null 2>&1"
-### alias -g NE="2> /dev/null"
-###     ... etc ...
-###
-### but maybe we'll be happier with prefix form:
-###     CA <command>
-### or at least
-###     NO <command>
-###     NE <command>
-###     NOE <command>
-### other examples
-###     TL
-###     T20
-###     LS
+# vim: ts=20 tw=0:
 
-# syntax
-# aliasname <TAB> pattern <TAB> replacement(shell) [ <TAB> condition(perl) ]
-# %% in pattern is (.+); % is (\S+)
-# %<digits> in repl is corresponding paren
-# rules are matched in sequence, condition is eval-ed in same perl process
+# generic: help for any command, piggybacking on the completion logic
+% -h$
+    @__ _commands | grep ^%1 | cut -f2-
+    __ _commands | grep ^%1 >/dev/null
 
-# some of these require 'sf' (which is a wrapper over 'find').  As such, they
-# won't be generally useful.  Ditto with the vim command 'Grep'.  Overall,
-# this is useless for others but shows how canonicalisation happens.
+# generic: is STDIN a pipe or a terminal? (side effect only; note the '0' at the end of the condition)
+%%	@die should not come here...	$ENV{_tty} = ( -t STDIN ? 1 : 0 ); 0
 
-# ---------- ALL ----------
-# these must come *before* all other transformations, so they are in the
-# shipped rc file (the one in the same directory as the binary).
-
-# make normal commands go through __ by prefixing with a "." (bloody zsh takes
-# over the _-prefixed versions)
-
-## *:(dir/)?LF[1-9]?, (dir/)?LL[1-9]?, Ym-..., Ymd-...
+# generic: make normal commands go through __ by prefixing with a "." (bloody
+# zsh takes over the _-prefixed versions)
 \.%	%1
 
+# ---- (first: LF/LL/Ym-/Ymd- since they affect everything else)
+
+## *:(dir/)?LF[1-9]?, (dir/)?LL[1-9]?, Ym-..., Ymd-...
 %% LF	%1 ./LF1.
 %% LF(\D\S+)	%1 ./LF1%2
 %% LF(\d)	%1 ./LF%2.
@@ -46,14 +24,12 @@
 %% %/LF(\D\S+)	%1 %2/LF1%3
 %% %/LF(\d)	%1 %2/LF%3.
 
-%% %/LF(\d)(\S+)	\
-                                %1 %2/`cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`	\
-                                                print STDERR "+%2/" . `cd %2 ;ls -Atrc|grep %4|tail -%3|head -1`
+%% %/LF(\d)(\S+)	%1 %2/`cd %2 ;ls -trc|grep %4|tail -%3|head -1`
 
 %% LL	%1 ./LL1
 %% LL(\d)	%1 ./LL%2
 %% (\D\S*)/LL	%1 %2/LL1
-%% %/LL(\d)	%1 %2/`cd %2 ;ls -A|tail -%3|head -1`	print STDERR "+%2/" . `cd %2 ;ls -A|tail -%3|head -1`
+%% %/LL(\d)	%1 %2/`cd %2 ;ls |tail -%3|head -1`
 
 %% Ym-%	%1 `date +%Y-%m-`%2
 %% Ymd-%	%1 `date +%Y-%m-%d-`%2
@@ -68,13 +44,13 @@ dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
 slow u(\d+) d(\d+)	_slow -u %1 -d %2
 slow u(\d+)	_slow -u %1
 slow d(\d+)	_slow -d %1
-slow	@echo usage: slow uN|dN|uN dN
 _slow	trickle -s
 ## nolang:delete LANG and LC_* then run
-nolang %	%1	delete $ENV{LANG}; \
-                                map { delete $ENV{$_} } \
-                                    grep /^LC_/, keys %ENV; \
-                                1
+nolang %	%1
+    ?   delete $ENV{LANG};
+        map { delete $ENV{$_} }
+            grep /^LC_/, keys %ENV;
+        1
 ## DO:DO [seconds] command args
 DO (\d+)	_DO %1
 DO	_DO 1
@@ -84,12 +60,28 @@ _DO % %%	@while :; do %2; sleep %1; done
 
 ## vw:vim which
 vw %%	$EDITOR `which %1`	$ENV{EDITOR}
+
+## vx:run vim on one-per-line file list (like 'xargs -d\\n' but without touching STDIN
+# vx is used in vm, vd, etc. but can also be used directly at the command line, as in:
+#   vx "`find | grep ' '`"
+# first, list mode.  Note we ignore %1 here and use the env vars that later code sets up
+vx %%	@echo -n "$_VX"	$ENV{_VX_LIST}
+# next, the actual execution (if the list mode env var was not set)
+# (the "treat newlines embedded in arguments as argument separators" logic makes this work)
+vx %%	vim %1
+
+v([mdr]) -l %%	v%1 %2	$ENV{_VX_LIST} = "-l"
+# user visible command (may have a -l as arg-1 also)
 ## vm:vim mru (from viminfo)
-vm %%	vv -m %1
 ## vd:vim file in dir
-vd %%	vv %1
 ## vr:vim file in repo
-vr %%	vv -r %1
+vm %%	@__ vx "$_VX"	$ENV{_VX} = `grep '^> ' ~/.viminfo | cut -c3- | mg %1`
+vd %%	@__ vx "$_VX"	$ENV{_VX} = `find . -name .git -prune -o -type f -print | mg %1`
+vr %%	@__ vx "$_VX"
+    ?   my $cdup = `git rev-parse --show-cdup`;
+        chomp $cdup; die "not at project root" if $cdup;
+        $ENV{_VX} = `git ls-tree -r --name-only HEAD | mg %1`
+
 ## vg:vim Grep; vg [iw]* ==> -i/-w
 vg i w %%	vg -i -w %1
 vg iw %%	vg -i -w %1
@@ -99,13 +91,21 @@ vg i %%	vg -i %1
 vg w %%	vg -w %1
 vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 
-# ---- text handling: mgrep, InPlace, field, hdt, hd, tc (un/fold)
+# ---- text handling: ew, sort-p, InPlace, field, hdt, hd
 
-## mgrep:mgrep word list; grep multiple words, prefix with "-" to exclude.  Last word is colored
-mgrep -i	mgrep	$ENV{MG_I}="-i"
-mgrep % %%	mgrep %1 | __ mgrep %2
-mgrep -%	@grep $MG_I -v %1
-mgrep %	@grep $MG_I --color %1
+## ew:ew pattern [paths] [-G include-glob ...]
+## ew:cmd | ew patterns
+## ew:(note 1: may have some space-in-filenames issues)
+## ew:(note 2: starting with an option means full manual control except -G)
+ew %	ew %1
+    ?   $ENV{_I} = "-i"; $ENV{_R} = "-r";       # ignore case on, recurse on
+        $ENV{_I} = "" if "%1" =~ /^-|[A-Z]/;    # ignore case off if starting with option or contains uppercase letter
+        $ENV{_R} = "" if $ENV{_tty} == 0;       # recurse off if pipe
+ew %%	ew %?	my $x = "%1"; $x =~ s/ -G / --include /g; $x;
+ew	grep -E -D skip --color=auto -I $_R $_I
+
+## sort-p: sort paragraphs using perl's -00
+sort-p	@perl -00 -e 'print sort <>'
 
 ## InPlace:(NO WARNINGS, NO SECOND CHANCES) frompatt topatt filelist...
 InPlace -i % %	perl -w -0777 -pi -e "s(%1)(%2)gi"
@@ -118,13 +118,30 @@ hdt	perl -pe 's/^\d{5,}(\.\d+)?/localtime $&/e'
 ## hd:|hd; hexdump using od options
 hd	od -Ax -tx1z -v
 
-## tc:tc fold|unfold
+## tc:tc fold|unfold [historical, now that we have 'mg -p' and 'sort-p']
 # I have a lot of files where I use a leading tab as a continuation marker
 # (i.e., 'grep' etc should look at those lines as one logical line)
 tc fold$	@perl -0777 -pe "s/\n\t/<x0D>/g"
 tc unfold$	@perl -pe 's/<x0D>/\n\t/g'
 
-# ---- file handing: ch, lf
+# ---- file handing: sf, ch, lf, tcp, tmv
+## sf:sf dirs -x N -f|-d|-l -t (mtime) -m (mmin) -s (size)
+# set up defaults
+sf$	sf . -f
+# note the extra blank at the start, and also that this can still be fooled if you have a filename like "aa -bb"
+sf %%	sf %1 -f	" %1" !~ / -/;
+# assume any directory names will come before options
+sf -%%	sf . -%1
+# parse
+sf %% -r %	sf %1 -iregex ".*%2.*"
+sf %% -(f|d|l) %	sf %1 -type %2 -iname "*%3*"	"%3" !~ /^-/
+sf %% -(f|d|l)	sf %1 -type %2
+sf %% -t	sf %1 -mtime
+sf %% -m	sf %1 -mmin
+sf %% -s	sf %1 -size
+sf %% -x %	sf %1	$ENV{_MD} = "-maxdepth %2"
+# execute
+sf (.*?)( -.*)	find -H %1 $_MD -name .git -prune -o %2 -print
 
 ## ch:chmod; ch r ==> -R go+rx, w ==> u+w, x ==> +x
 ch r	chmod -R go+rX
@@ -141,6 +158,13 @@ lf %$	lf . %1 -10
 lf % \. -%	ls -Altrc "%1" | tail -%2
 # canonical form 2
 lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
+
+## tcp:tcp file (copies file to /tmp, runs ch r on it, then arranges to have it disappear in 1 hour)
+## tmv:tmv file (moved  file to /tmp, runs ch r on it, then arranges to have it disappear in 1 hour)
+tcp %%/%	cp %1/%2 /tmp; __ ch r /tmp/%2 ; ( ( cd /tmp; sleep 1h; rm %2 ) & )
+tcp %	__ tcp ./%1
+tmv %%/%	mv %1/%2 /tmp; __ ch r /tmp/%2 ; ( ( cd /tmp; sleep 1h; rm %2 ) & )
+tmv %	__ tmv ./%1
 
 # ---- git (--, ts/tg, glg, t1/t4)
 
@@ -166,15 +190,13 @@ t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
 
 # ---- system (qf, qd, gu, fssum, flsum)
 
-## qf:rpm -qf (args or STDIN)
+## qf:rpm -qf (args or STDIN; arg without a "/" will be 'which'-ed)
+qf %$	qf `which %1`	"%1" !~ m(/)
 qf$	xargs rpm -qf
 qf	rpm -qf
 
 ## qd:qd rpmname
 qd %	less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
-
-## gu:gaf cycle && gaf pall
-gu	gaf cycle && gaf pall
 
 ## flsum:|flsum (\d+)?; file list summary, keep upto NUM slashes and summarise
 flsum$	flsum 2
@@ -182,54 +204,68 @@ flsum %$	perl -pe "s/(([^\/]+\/){%1}).*/\$1/" | sort | uniq -c
 
 ## fssum:fssum [dir], print #dirs, #files, size dist
 fssum %	fssum	chdir $1
-fssum	@du -sm .; \
-                echo -e `find . -type d | wc -l `'\tdirectories'; \
-                echo -e `find . -type f | wc -l `'\tfiles'; \
-                echo '  FILES MB      CUM MB'; \
-                find . -type f -print0 | \
-                    xargs -0 du -sm | cut -f1 | \
-                    sort | uniq -c | sort -k 2nr | \
-                perl -lpe '($a,$b)=split;$tot+=$a*$b;$_.="\t$tot"'
+fssum
+    @du -sm .
+    echo -e `find . -type d | wc -l `'\tdirectories'
+    echo -e `find . -type f | wc -l `'\tfiles'
+    echo '(files, MB, cum MB)'
+    find . -type f -print0 |
+        xargs -0 du -sm | cut -f1 |
+        sort | uniq -c | sort -k 2nr |
+    perl -lpe '($a,$b)=split;$tot+=$a*$b;$_.="\t$tot"'
 
-# ---- sec (bf, PWGEN, crypdf)
+# ---- sec: 2f, crypdf, PWGEN
 
-## bf:bf e|d|ea|da
-bf ea	bf e -a
-bf da	bf d -a
-bf e	openssl bf -salt
-bf d	openssl bf -d
+# ## bf:bf e|d|ea|da
+# bf ea	bf e -a
+# bf da	bf d -a
+# bf e	openssl bf -salt
+# bf d	openssl bf -d
+2f e	gpg -c --cipher-algo twofish
+2f d	gpg -d
 # TODO: inplace enc/dec
 
 ## crypdf:crypdf d|e infile outfile [other flags for enc], (password will be asked on STDIN)
 # note: okular as of 2015-06-06 does not read 256 bit encrypted files so no point
 crypdf d % %	qpdf --empty --pages %1 --password=`cat` -- %2
-
-crypdf e	crypdf e	chomp($ENV{CP_PW}=<STDIN>); \
-                                $ENV{CP_FLAGS}="128 --use-aes=y";\
-                                1
-
-crypdf e % % %%$	\
-                crypdf e %1 %2	$ENV{CP_FLAGS}.=" %3"; 1
-
-crypdf e % %$	qpdf --empty --pages %1 -- \
-                    --encrypt $CP_PW $CP_PW $CP_FLAGS -- \
-                    %2
+crypdf e	crypdf e
+    ?   chomp($ENV{CP_PW}=<STDIN>);
+        $ENV{CP_FLAGS}="128 --use-aes=y";
+        1
+crypdf e % % %%$	crypdf e %1 %2	$ENV{CP_FLAGS}.=" %3"; 1
+crypdf e % %$	qpdf --empty --pages %1 -- --encrypt $CP_PW $CP_PW $CP_FLAGS -- %2
 
 ## PWGEN
-PWGEN	cat /usr/share/dict/words | \
-                    egrep '^.{3,6}$' | \
-                    shuf 2>/dev/null | \
-                    head -1000 | \
-                    egrep '^[a-z]*$' | \
-                    column | \
-                    head
+PWGEN
+    @cat /usr/share/dict/words |
+    egrep '^.{3,6}$' |
+    shuf 2>/dev/null |
+    head -1000 |
+    egrep '^[a-z]*$' |
+    column |
+    head
 
-# ---- misc (dot, mix)
+# ---- misc (dot, pdfpages, pdfopt)
 
 ## dot:dot gv-file [png-file] (defaults to ~/junk.png)
 dot %$	dot %1 ~/junk.png
 dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
-meb	MIX_ENV=prod mix escript.build --force
-mt	mix test && git log -1 --format='%h %ai %s' >> .git/test.log
 
-# vim: ts=16:
+## pdfpages:pdfpages M N infile outfile
+## pdfopt:pdfopt infile outfile
+pdfpages % % % %	/usr/bin/gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dFirstPage=%1 -dLastPage=%2 -sOutputFile=%4 %3
+pdfopt % %	/usr/bin/gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%2 %1
+
+# ----
+# obsolete/unused/really really rarely used
+# also, cool tricks I may no longer need but don't want to forget!
+
+##  ## mg:mg [-p] words; each word smartcase, -word is -v, -p is -00
+##  xmg -p	xmg	$ENV{MG_PARA} = '-00';
+##  xmg %$	@__ _mg %1
+##  xmg % %%	@__ _mg %1 | __ xmg %2
+##  _mg -%	@perl $MG_PARA -lne 'print unless /%1/'	"%1" =~ /[A-Z]/
+##  _mg -%	@perl $MG_PARA -lne 'print unless /%1/i'
+##  _mg %	@perl $MG_PARA -lne 'print if     /%1/'	"%1" =~ /[A-Z]/
+##  _mg %	@perl $MG_PARA -lne 'print if     /%1/i'
+
