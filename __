@@ -75,8 +75,8 @@ for my $r (@rules) {
         $cond = unesc($cond);
         say STDERR "\t?\t$cond" if $ENV{D};
         $rc = eval $cond;
-        say STDERR "\tX\t'$@'" unless defined($rc);
-        say STDERR "\t!\t'$rc'" if $ENV{D} and $rc;
+        say STDERR "\tX\t'$@'" if $ENV{D} and not defined($rc);
+        say STDERR "\t!\t'$rc'" if $ENV{D} and defined $rc;
         next if not $rc;
     }
 
