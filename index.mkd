@@ -280,8 +280,6 @@ The correct syntax for each rule is:
     pattern
         replacement command (shell)
         (optional: more lines of replacement command)
-        ...
-        ...
         ?   condition code (perl)
             (optional: more lines of condition code)
 

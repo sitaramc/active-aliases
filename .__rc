@@ -94,14 +94,15 @@ vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
 # ---- text handling: ew, sort-p, InPlace, field, hdt, hd
 
 ## ew:ew pattern [paths] [-G include-glob ...]
-## ew:cmd | ew patterns
+## ew:cmd | ew pattern
 ## ew:(note 1: may have some space-in-filenames issues)
 ## ew:(note 2: starting with an option means full manual control except -G)
 ew %	ew %1
     ?   $ENV{_I} = "-i"; $ENV{_R} = "-r";       # ignore case on, recurse on
         $ENV{_I} = "" if "%1" =~ /^-|[A-Z]/;    # ignore case off if starting with option or contains uppercase letter
         $ENV{_R} = "" if $ENV{_tty} == 0;       # recurse off if pipe
-ew %%	ew %?	my $x = "%1"; $x =~ s/ -G / --include /g; $x;
+ew %%	ew %?
+    ?   my $x = "%1"; $x =~ s/ -G (\S+)/ --include "$1"/g; $x;
 ew	grep -E -D skip --color=auto -I $_R $_I
 
 ## sort-p: sort paragraphs using perl's -00
