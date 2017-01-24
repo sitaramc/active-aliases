@@ -189,7 +189,7 @@ t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
 ## t4
 t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
 
-# ---- system (qf, qd, gu, fssum, flsum)
+# ---- system (qf, qd, ql, fssum, flsum)
 
 ## qf:rpm -qf (args or STDIN; arg without a "/" will be 'which'-ed)
 qf %$	qf `which %1`	"%1" !~ m(/)
@@ -197,7 +197,14 @@ qf$	xargs rpm -qf
 qf	rpm -qf
 
 ## qd:qd rpmname
-qd %	less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
+qd f %	qd `__ qf %1`
+qd %	@echo %1; less `rpm -qd %1 | grep -v man.man`; man `rpm -qd %1 | grep man.man`
+
+## ql:ql rpmname [m|b]
+ql f %	ql `__ qf %1`
+ql % b	rpm -ql %1 | grep bin/
+ql % m	rpm -ql %1 | grep man/man
+ql %	rpm -ql %1 | grep -e bin/ -e man/man
 
 ## flsum:|flsum (\d+)?; file list summary, keep upto NUM slashes and summarise
 flsum$	flsum 2
