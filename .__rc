@@ -103,7 +103,7 @@ ew %	ew %1
         $ENV{_R} = "" if $ENV{_tty} == 0;       # recurse off if pipe
 ew %%	ew %?
     ?   my $x = "%1"; $x =~ s/ -G (\S+)/ --include "$1"/g; $x;
-ew	grep -E -D skip --color=auto -I $_R $_I
+ew	grep -E -D skip --exclude-dir=.git --color=auto -I $_R $_I
 
 ## sort-p: sort paragraphs using perl's -00
 sort-p	@perl -00 -e 'print sort <>'
