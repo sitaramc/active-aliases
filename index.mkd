@@ -9,23 +9,24 @@ Clone the [repo](https://github.com/sitaramc/active-aliases) or grab the
 [sample rc
 file](https://github.com/sitaramc/active-aliases/blob/master/.__rc).
 
-# basics and some quick examples
+The 
+[README](https://github.com/sitaramc/active-aliases/blob/master/README.markdown)
+has some teasers if you want to get a general idea of what this, without
+jumping in.
+
+# intro, and some quick examples
 
 @@box-r(The program itself is called `__` (yes, that's two underscores), but
 as you will see in the [invocation][inv] section, I rarely even type that.)@@
 
-Zsh has something called "global aliases", which are aliases that expand
-anywhere on the command line, not just in the command name.  I wanted
-something like that, but (a) I don't have zsh everywhere I need to work, (b) I
-want them to expand differently for different commands.
+As the
+[README](https://github.com/sitaramc/active-aliases/blob/master/README.markdown)
+says, I basically wanted a quick way to implement commands without worrying
+about argument processing.
 
-For example, I want `ch r ...` to expand to `chmod -R go+rX ...`, but `gpg r
-...` to expand to `gpg -r sitaramc@gmail.com ...`, even though in both cases
-the word being expanded is the same (the letter 'r').
-
-What I came up with is a way to take a command, and keep morphing it into
-something else, possibly in multiple steps, and execute whatever comes out at
-the end.  At each step, the replacement becomes the new command, which may be
+With active-aliases, you take a (user-supplied) command, and morph it
+according to a set of rules, and whatever is left at the end, is what gets
+executed.  At each step, the replacement becomes the new command, which may be
 quite different from the old one.
 
 Here's a *very small* example.  Notice how, if you give it just 'glg', it
@@ -54,13 +55,13 @@ As of 2017-01-26, the syntax has been changed somewhat.  There's a whole
 section devoted to syntax later, but note that the above can also, for
 convenience, be written as:
 
-    ch r    chmod -R go+rX
-    ch w    chmod u+w
-    ch x    chmod +x
+    ch r                chmod -R go+rX
+    ch w                chmod u+w
+    ch x                chmod +x
 
 Except it needs a **hard tab** just between the comand and the replacement.
 We will use this syntax where convenient, please assume the hard tabs are
-there!
+there, and if you're copy-pasting, be sure to add them.
 
 # features/concepts
 
@@ -70,18 +71,18 @@ there!
 based on matching a list of patterns is not new.  If you don't know where I
 got it from, you're not old enough ;-))@@
 
-Here's an example of an alias that allows me to say 'cg cool', or 'cg fast',
-to set predefined CPU frequency governors, or for example, 'cg powersave'
-etc., for other governors without their own shortcut word.  In addition, if I
-type just 'cg', I get 'cg cool'.
+Here's an example we've already seen in the
+[README](https://github.com/sitaramc/active-aliases/blob/master/README.markdown),
+but is worth revisiting.
 
-    cg$             cg cool
-    cg cool$        cg ondemand
-    cg fast$        cg performance
-    cg              cpupower -c all frequency-set -g
+    cpu$                cpu cool
+    cpu cool$           cpu powersave
+    cpu fast$           cpu performance
+    cpu                 cpupower -c all frequency-set -g
 
-Actually, 'cg' morphs to 'cg cool', then 'cg cool' morphs to 'cg ondemand',
-and *that* finally morphs to 'cpupower -c all frequency-set -g ondemand'.
+The important point to note is that 'cpu' morphs to 'cpu cool', then 'cpu
+cool' morphs to 'cpu powersave', and *that* finally morphs to 'cpupower -c all
+frequency-set -g powersave'.
 
 Here's a slightly longer, but still very simple, example.  I often encrypt
 files, either with my gpg key, or with an ad hoc (manually typed) symmetric
@@ -144,110 +145,30 @@ false, the command is NOT morphed; it remains "dim (something)" instead of
 becoming "xbacklight -set (something)", and thus matches the next line's
 pattern.
 
-# more examples
+Here's another simple example.  When I find a file on the system that I'm not
+sure what it is for, I have to first run "rpm -qf" on it to find the package
+name, and then, in many cases, run "rpm -qi" on the package name to get some
+human-readable details.
 
-## shallow recursion -- multi grep {#mgrep}
+Also, if the filename I supply does not have a "/" in it, the script will
+treat that as a binary, resolve that using `which`, and then run on *that*.
 
-I often have to do something like this:
+In shell, this would (probably) be:
 
-    ... | grep foo | grep -v bar | grep baz
+    qif() {
+        f=$1
+        [[ $f =~ / ]] || f=`which $f`
+        rpm -qi $(rpm -qf $f)
+    }
 
-The following rc lines allow me to just say `... | mgrep foo -bar baz`:
+With active-aliases, it's:
 
-    mgrep % %%         mgrep %1 | __ mgrep %2
-    mgrep -%           @grep -v %1
-    mgrep %            @grep    %1
+    qif %               qif `which %1`
+        ?   "%2" !~ m(/)
+    qif %               rpm -qi $(rpm -qf %1)
 
-With a little extra, you can also allow an explicit "-i" (ignore case option):
-
-    mgrep -i           mgrep                     $ENV{MG_I}="-i"
-    mgrep % %%         mgrep %1 | __ mgrep %2
-    mgrep -%           @grep $MG_I -v %1
-    mgrep %            @grep $MG_I %1
-
-Note the first line specifies a "morph" that removes the "-i", and the
-"condition" has a side-effect of setting the environment variable, which is
-used later in the grep command invocations.
-
-You can also get "smartcase" (a nice feature where, if the pattern has any
-uppercase letters, it is considered case-sensitive, but if it is all
-lowercase, then a "-i" is implied):
-
-    mgrep % %%         mgrep %1 | __ mgrep %2
-    mgrep              mgrep
-        ?   "%1" !~ /[A-Z]/ and  $ENV{MG_I}="-i"
-    mgrep -%           @grep $MG_I -v %1
-    mgrep %            @grep $MG_I %1
-
-Here, we're using the "condition" field in the second rule to set an
-environment variable as a side effect, and using that later.  The actual
-command does not change at all, since the replacement is the same as the
-pattern.
-
-(I wouldn't go too deep; each word adds one process to the pipe, but for most
-human needs, it should do fine!)
-
-## the unmatched part of the command line
-
-Here's one that lets me edit a base set of files (i.e., those in
-`~/.gitolite/conf`) if I run just the command, but if I add "-a" it lets me
-edit the base set *and* some other files (i.e., gl-conf files in first level
-repositories):
-
-    vconf -a$       vconf $HOME/repositories/*.git/gl-conf
-    vconf           vconf $HOME/.gitolite/conf/*
-    vconf           ${EDITOR:-vim}
-
-How does this work?  At each stage, only the part of the current command that
-matches the pattern is morphed.  Anything left over (unmatched) from the old
-command remains, unchanged, after the morphed part.  Here's what the command
-looks like after each line, starting from 'vconf -a'.
-
-    1:  vconf $HOME/repositories/*.git/gl-conf
-    2:  vconf $HOME/.gitolite/conf/* $HOME/repositories/*.git/gl-conf
-        ^--- matched/morphed ------^ ^-- unmatched (carried over) --^
-    3:    vim $HOME/.gitolite/conf/* $HOME/repositories/*.git/gl-conf
-
-## argument parsing the easy way
-
-Here's our final example, showing several tricks.
-
-What it does is allow me to start youtube downloads using either the URL
-itself, or the name of a file that was (maybe partially) downloaded, since the
-file name contains the youtube "id" (that random 10-digit string you see in
-youtube URLs).
-
-    yd                      yd
-        ?   chdir "$ENV{HOME}/yt"
-    yd http%                _yd http%1
-    yd %.part               yd %1
-    yd .*-(\S{10,})\.\w+$   _yd https://www.youtube.com/watch?v=%1
-    _yd                     youtube-dl
-
-Points to note:
-
-*   the first rule again shows a side-effect being used (change directory);
-    notice that the replacement is the same as the pattern so the actual
-    command does not change.
-
-*   if an argument starting with http is seen, the second rule *changes the
-    command name* from `yd` to `_yd`.  This is a clever way to *bypass* all
-    other rules matching the 'yd' command.
-
-*   a trailing ".part" is removed from the argument in the 3rd rule.  This is
-    the kind of thing where the idea of step-by-step morphing a command rule
-    becomes really intuitive.
-
-*   and finally, the 4th rule gets the juicy bit (the 10-character youtube
-    "id") from the file name, constructs a URL from it, and (like rule 2)
-    changes the command name to `_yd`.  In spirit, this isn't much different
-    from rule 3, just that the expression is a bit more complex.
-
-Why couldn't we remove rule 5 and simply use 'youtube-dl' in rules 2 and 4?
-We could, but if we want to add any default arguments etc., later, we'd need
-to add them in two places.
-
-Try that in any shell :)
+The actual length does not change much, but it's much more clear what we are
+doing.
 
 # details
 
@@ -375,6 +296,119 @@ You can invoke `__` in the following ways:
 ## installation
 
 Just put it in your path somewhere.
+
+# more examples
+
+## shallow recursion -- multi grep {#mgrep}
+
+We've already seen this in the README:
+
+    mgrep % %%          __ mgrep %1 | __ mgrep %2
+
+    mgrep -%$           grep -v -i %1
+    mgrep %$            grep -i %1
+
+Briefly, this lets me say
+
+    ... | mgrep foo -bar baz
+
+instead of
+
+    ... | grep foo | grep -v bar | grep baz
+
+With a little extra, you can also make the "-i" explicit:
+
+    mgrep -i            mgrep
+        ?   $ENV{MG_I}="-i"
+    mgrep % %%          __ mgrep %1 | __ mgrep %2
+    mgrep -%$           grep -v $MG_I %1
+    mgrep %$            grep $MG_I %1
+
+Note the first rule specifies a "morph" that removes the "-i", and the
+"condition" has a side-effect of setting the environment variable, which is
+used later in the grep command invocations.
+
+You can even get "smartcase" (a nice feature where, if the pattern has any
+uppercase letters, it is considered case-sensitive, but if it is all
+lowercase, then a "-i" is implied).  And this can now be applied to each
+search pattern separately:
+
+    mgrep % %%          __ mgrep %1 | __ mgrep %2
+    mgrep               mgrep
+        ?   "%1" !~ /[A-Z]/ and  $ENV{MG_I}="-i"
+    mgrep -%            grep $MG_I -v %1
+    mgrep %             grep $MG_I %1
+
+This is the same technique as before, except it happens to each grep
+separately, and the decision (whether to insert a "-i") is based on something
+else (the presence or absence of any upper case letters in the string).  The
+actual command does not change at all, since the replacement is the same as
+the pattern.
+
+(I wouldn't go too deep; each word adds one process to the pipe, but for most
+human needs, it should do fine!)
+
+## the unmatched part of the command line
+
+Here's one that lets me edit a base set of files (i.e., those in
+`~/.gitolite/conf`) if I run just the command, but if I add "-a" it lets me
+edit the base set *and* some other files (i.e., gl-conf files in first level
+repositories):
+
+    vconf -a$       vconf $HOME/repositories/*.git/gl-conf
+    vconf           vconf $HOME/.gitolite/conf/*
+    vconf           ${EDITOR:-vim}
+
+How does this work?  At each stage, only the part of the current command that
+matches the pattern is morphed.  Anything left over (unmatched) from the old
+command remains, unchanged, after the morphed part.  Here's what the command
+looks like after each line, starting from 'vconf -a'.
+
+    1:  vconf $HOME/repositories/*.git/gl-conf
+    2:  vconf $HOME/.gitolite/conf/* $HOME/repositories/*.git/gl-conf
+        ^--- matched/morphed ------^ ^-- unmatched (carried over) --^
+    3:    vim $HOME/.gitolite/conf/* $HOME/repositories/*.git/gl-conf
+
+## argument parsing the easy way
+
+Here's our final example, showing several tricks.
+
+What it does is allow me to start youtube downloads using either the URL
+itself, or the name of a file that was (maybe partially) downloaded, since the
+file name contains the youtube "id" (that random 10-digit string you see in
+youtube URLs).
+
+    yd                      yd
+        ?   chdir "$ENV{HOME}/yt"
+    yd http%                _yd http%1
+    yd %.part               yd %1
+    yd .*-(\S{10,})\.\w+$   _yd https://www.youtube.com/watch?v=%1
+    _yd                     youtube-dl
+
+Points to note:
+
+*   the first rule again shows a side-effect being used (change directory);
+    notice that the replacement is the same as the pattern so the actual
+    command does not change.
+
+*   if an argument starting with http is seen, the second rule *changes the
+    command name* from `yd` to `_yd`.  This is a clever way to *bypass* all
+    other rules matching the 'yd' command.
+
+*   a trailing ".part" is removed from the argument in the 3rd rule.  This is
+    the kind of thing where the idea of step-by-step morphing a command rule
+    becomes really intuitive.
+
+*   and finally, the 4th rule gets the juicy bit (the 10-character youtube
+    "id") from the file name, constructs a URL from it, and (like rule 2)
+    changes the command name to `_yd`.  In spirit, this isn't much different
+    from rule 3, just that the expression is a bit more complex.
+
+Why couldn't we remove rule 5 and simply use 'youtube-dl' in rules 2 and 4?
+We could, but if we want to add any default arguments etc., later, we'd need
+to add them in two places.
+
+Try that in any shell :)
 
 # appendix 1 -- unknown command helper code
 
