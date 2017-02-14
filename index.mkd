@@ -307,6 +307,11 @@ Here's some more detail about the 3 fields:
     They are both considered parenthesised sub-expressions; you don't have to
     put them in parentheses.
 
+    (For regex-aware people, there's also `%%?`, which is a non-greedy version
+    of `%%`.  Discussion of greediness in a regex quantifier is out of scope
+    of this documentation, but can be obtained from pretty much any decent
+    regex tutorial or help page).
+
     The pattern need not match the entire current command unless it ends with
     a `$`.  Only the part of the "current command" that matches this pattern
     will be morphed.  The rest will stay as-is.  (There's an example of this

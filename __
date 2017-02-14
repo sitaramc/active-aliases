@@ -53,6 +53,7 @@ for my $r (@rules) {
     # for debug printing only; not needed otherwise
 
     # replace %% and % in "pattern" string with actual regex sequences
+    $pattern =~ s/%%\?/(.+?)/g;
     $pattern =~ s/%%/(.+)/g;
     $pattern =~ s/%/(\\S+)/g;
     $pattern = "^$pattern(?= |\$)";
