@@ -16,6 +16,12 @@ $Data::Dumper::Indent = 0;
 
 use URI::Escape;
 
+my $script = get_script();
+# global; name of script to use if arg-1 is a valid __ script (or a shell
+# script, since that may internally have begin/end sections for us).  Also
+# shifts ARGV in that case.
+say STDERR Dumper [ "script = $script", \@ARGV ] if $ENV{D};
+
 # treat newlines embedded in arguments as argument separators.  This lets you
 # operate on "`find ...`" (note the double quotes).
 @ARGV = split("\n", join("\n", @ARGV));
@@ -25,8 +31,9 @@ use URI::Escape;
 my $fullcmd = join( " ", map { esc($_) } @ARGV );
 my $cmd_name = shift || '';
 
-# now we need to get the pattern+replacement list, which comes from the
-# following sources, in sequence:
+# now we need to get the pattern+replacement list, which is either the shipped
+# rc file plus the script given on the command line, or the shipped rc file
+# plus all the rc files in the path upto $HOME.  That is, in the latter case:
 #       dirname($0)/.__rc   # shipped rc file
 #       $PWD/.__rc
 #       $PWD/../.__rc       # that is, .__rc in the parent of $PWD
@@ -141,6 +148,9 @@ sub quote_unesc {
 sub get_rc_filenames {
     use Cwd;
     my $bd = $1 if $0 =~ m((.*)/);
+
+    return ("$bd/.__rc") if $script;
+
     my $home = $ENV{HOME};
     my $cur = getcwd;
 
@@ -182,6 +192,13 @@ sub get_rules {
     @ARGV = get_rc_filenames();
 
     my $raw = join "", grep { /\S/ } grep { ! /^\s*#/ } <>;
+    if ($script) {
+        my $s = slurp($script);
+        $s = join("", $s =~ m(^# __ begin.*?^# __ end\n)gms) if $s =~ m(^# __ begin)mi;
+        $s =~ s(^\s*#.*\n)()gm;
+        $s =~ s(^\s*\n)()gm;
+        $raw .= $s;
+    }
     ## ?? $raw =~ s/^(?=\S)/\n/gm;    # add a blank line
 
     # backward compat to old syntax (except backslash-line-continuation)
@@ -231,3 +248,12 @@ sub slurp {
     return <$fh>;
 }
 
+sub get_script {
+    # munges @ARGV
+    return '' unless -f $ARGV[0];
+    my $fh = _open( "<", $ARGV[0]) ;
+    return '' unless <$fh> =~ m(^#!.*(__|sh));
+    my $f = shift @ARGV;
+    $ENV{__SCRIPT} = $f;
+    return $f;
+}
