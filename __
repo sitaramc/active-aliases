@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use 5.10.0;
 use Data::Dumper;
+$Data::Dumper::Indent = 0;
 
 # ----------------------------------------------------------------------
 
@@ -13,10 +14,6 @@ use Data::Dumper;
 # matching a list of patterns is not new.  If you don't know where I got it
 # from, you're not old enough ;-)
 
-# NOTE: at present the "config" for this is right here in this file.  If
-# anyone other than me actually starts using it, it may be worth moving into a
-# separate file so the code can be updated cleanly.
-
 use URI::Escape;
 
 # treat newlines embedded in arguments as argument separators.  This lets you
@@ -26,7 +23,7 @@ use URI::Escape;
 # we need the full command as one string, but we take care to escape the
 # spaces first, so we can split out arguments properly later
 my $fullcmd = join( " ", map { esc($_) } @ARGV );
-my $cmd_name = shift;
+my $cmd_name = shift || '';
 
 # now we need to get the pattern+replacement list, which comes from the
 # following sources, in sequence:
@@ -49,7 +46,7 @@ for my $r (@rules) {
     $cond ||= '';    # avoid undef warnings later
     chomp($cond);
 
-    my $f0 = "<<<\np=$pattern\nfc=$fullcmd\n>>>" if $ENV{D};
+    my $f0 = "p=$pattern\nfc=$fullcmd" if $ENV{D};
     # for debug printing only; not needed otherwise
 
     # replace %% and % in "pattern" string with actual regex sequences
@@ -76,8 +73,8 @@ for my $r (@rules) {
         $cond = unesc($cond);
         say STDERR "\t?\t$cond" if $ENV{D};
         $rc = eval $cond;
-        say STDERR "\tX\t'$@'" if $ENV{D} and not defined($rc);
-        say STDERR "\t!\t'$rc'" if $ENV{D} and defined $rc;
+        say STDERR "\t@\t'$@'" if $ENV{D} and not defined($rc);
+        say STDERR "\trc\t'$rc'" if $ENV{D} and defined $rc;
         next if not $rc;
     }
 
@@ -88,7 +85,7 @@ for my $r (@rules) {
     # and if it now contains a backtick, reduce it to the output of the
     # command inside backticks
     if ( $repl =~ /`/ ) {
-        say STDERR "\t`\t$repl" if $ENV{D};
+        say STDERR "`\t$repl" if $ENV{D};
         $repl =~ s/`(.*?)`/_shell($1)/ge;
     }
 
@@ -96,7 +93,7 @@ for my $r (@rules) {
     $fullcmd =~ s($pattern)($repl);
     ($cmd_name) = split ' ', $fullcmd;
 
-    say STDERR "\t=\t$fullcmd" if $ENV{D};
+    say STDERR "=\t$fullcmd" if $ENV{D};
 
     last if $fullcmd =~ m(^\@);     # slight optimisation
 }
@@ -159,7 +156,7 @@ sub get_rc_filenames {
     }
 
     if ($ENV{D}) {
-        say STDERR Dumper ['@ret:', @ret];
+        say STDERR Dumper \@ret;
     }
 
     return @ret;
@@ -198,6 +195,7 @@ sub get_rules {
         $c = $1 if $p =~ s(\n    \?   (.*))()s;
         $r = $1 if $p =~ s(\n    (\S.*))()s;
         die unless $r;  # 'repl' mandatory, 'cond' is not
+        # TODO: consider removing the indent from $r and $c, so that multi-line 'echo's work ok
         push @rules, [$p, $r, $c];
     }
 
