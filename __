@@ -194,7 +194,9 @@ sub get_rules {
     my $raw = join "", grep { /\S/ } grep { ! /^\s*#/ } <>;
     if ($script) {
         my $s = slurp($script);
-        $s = join("", $s =~ m(^# __ begin.*?^# __ end\n)gms) if $s =~ m(^# __ begin)mi;
+        # delete till #!__ marker (if it does not exist, the whole file is ours)
+        $s =~ s/.*^#!\S*__\s//ms;
+        # delete comments and blank lines, like for $raw above
         $s =~ s(^\s*#.*\n)()gm;
         $s =~ s(^\s*\n)()gm;
         $raw .= $s;
