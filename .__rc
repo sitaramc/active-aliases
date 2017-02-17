@@ -38,8 +38,8 @@
 
 ## dm:daemonise; dm (sleep time)? file|command
 dm %	dm xdg-open %1	-f "%1" and not -x "%1"
-dm %%	( ( sleep 1; nice %1 >/dev/null 2>&1 ) & )
 dm (\d) %%	( ( notify-send -t "%1"000 "%2" "`nice %2 2>&1`" ) & )
+dm %%	( ( sleep 1; nice %1 >/dev/null 2>&1 ) & )
 ## slow:slow (uN|dN|uN dN)
 slow u(\d+) d(\d+)	_slow -u %1 -d %2
 slow u(\d+)	_slow -u %1
@@ -191,10 +191,10 @@ t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
 
 # ---- system (qf, qd, ql, fssum, flsum)
 
-## qf:rpm -qf (args or STDIN; arg without a "/" will be 'which'-ed)
-qf %$	qf `which %1`	"%1" !~ m(/)
+## qf:rpm -qf (arg or STDIN; arg without a "/" will be 'which'-ed)
+qf %/%	rpm -qf %1/%2
+qf %$	rpm -qf `which %1`
 qf$	xargs rpm -qf
-qf	rpm -qf
 
 ## qd:qd rpmname
 qd f %	qd `__ qf %1`
