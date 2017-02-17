@@ -116,13 +116,20 @@ exec("$fullcmd") or die "__: $cmd_name: command not found\n";
 
 sub _shell {
     my $x = shift;
+    my $lines = $x =~ s/^LINES: ?//;
     $x = `$x`;
     # escape the results of the execution but not across lines
     # XXX WARNING XXX
     # i.e., this behaves like 'map', not 'xargs' (one line is one "item")
-    $x = esc($x);
-    $x =~ s/\n$//;
-    $x =~ s/\n+/ /g;
+    if ($lines) {
+        $x = esc($x);
+        $x =~ s/\n$//;
+        $x =~ s/\n+/ /g;
+    } else {
+        $x =~ s/\s+/ /g;
+        $x =~ s/^ //;
+        $x =~ s/ $//;
+    }
     return $x;
 }
 
