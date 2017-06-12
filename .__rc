@@ -26,15 +26,21 @@
 
 %% %/LF(\d)(\S+)	%1 %2/`cd %2 ;ls -trc|grep %4|tail -%3|head -1`
 
-%% LL	%1 ./LL1
-%% LL(\d)	%1 ./LL%2
-%% (\D\S*)/LL	%1 %2/LL1
-%% %/LL(\d)	%1 %2/`cd %2 ;ls |tail -%3|head -1`
+%% LL	%1 ./LL1.
+%% LL(\D\S+)	%1 ./LL1%2
+%% LL(\d)	%1 ./LL%2.
+%% LL(\d\S+)	%1 ./LL%2
+
+%% %/LL	%1 %2/LL1.
+%% %/LL(\D\S+)	%1 %2/LL1%3
+%% %/LL(\d)	%1 %2/LL%3.
+
+%% %/LL(\d)(\S+)	%1 %2/`cd %2 ;ls|grep %4|tail -%3|head -1`
 
 %% Ym-%	%1 `date +%Y-%m-`%2
 %% Ymd-%	%1 `date +%Y-%m-%d-`%2
 
-# ---- process control: dm, slow, nolang, DO
+# ---- meta/process control: dm, slow, nolang, DO, CP
 
 ## dm:daemonise; dm (sleep time)? file|command
 dm %	dm xdg-open %1	-f "%1" and not -x "%1"
@@ -55,6 +61,20 @@ nolang %	%1
 DO (\d+)	_DO %1
 DO	_DO 1
 _DO % %%	@while :; do %2; sleep %1; done
+
+# cartesian product for 2 lists.  If you need more than two lists use the
+# cart-prod program, but this is good for simple stuff within aa.
+## CP:CP aa-cmd list1 // list2
+CP % %%
+    CP %2
+    ?   not $ENV{_AACMD} and $ENV{_AACMD} = "%1"
+
+CP % %% // %%
+    @__ CP %1 // %3; exec __ CP %2 // %3
+CP % // % %%
+    CP %1 // %2; exec __ CP %1 // %3
+CP % // %
+    @__ $_AACMD %1 %2
 
 # ---- vim: vw/vm/vd/vr/vg
 
@@ -108,7 +128,7 @@ ew	grep -E -D skip --exclude-dir=.git --color=auto -I $_R $_I
 ## sort-p: sort paragraphs using perl's -00
 sort-p	@perl -00 -e 'print sort <>'
 
-## InPlace:(NO WARNINGS, NO SECOND CHANCES) frompatt topatt filelist...
+## InPlace:(NO SECOND CHANCES) frompatt topatt filelist...
 InPlace -i % %	perl -w -0777 -pi -e "s(%1)(%2)gi"
 InPlace % %	perl -w -0777 -pi -e "s(%1)(%2)g"
 
@@ -125,7 +145,7 @@ hd	od -Ax -tx1z -v
 tc fold$	@perl -0777 -pe "s/\n\t/<x0D>/g"
 tc unfold$	@perl -pe 's/<x0D>/\n\t/g'
 
-# ---- file handing: sf, ch, lf, tcp, tmv
+# ---- file handing: sf, ch, lf, tcp, tmv, xfr (rsync)
 ## sf:sf dirs -x N -f|-d|-l -t (mtime) -m (mmin) -s (size)
 # set up defaults
 sf$	sf . -f
@@ -162,10 +182,17 @@ lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
 
 ## tcp:tcp file (copies file to /tmp, runs ch r on it, then arranges to have it disappear in 1 hour)
 ## tmv:tmv file (moved  file to /tmp, runs ch r on it, then arranges to have it disappear in 1 hour)
+tcp % %%	@__ tcp %1; exec __ tcp %2
 tcp %%/%	cp %1/%2 /tmp; __ ch r /tmp/%2 ; ( ( cd /tmp; sleep 1h; rm %2 ) & )
 tcp %	__ tcp ./%1
+tmv % %%	@__ tmv %1; exec __ tmv %2
 tmv %%/%	mv %1/%2 /tmp; __ ch r /tmp/%2 ; ( ( cd /tmp; sleep 1h; rm %2 ) & )
 tmv %	__ tmv ./%1
+
+## xfr:xfr a [b]
+## putr:putr file remote:[dir]
+xfr %$	xfr %1 .
+xfr % %	rsync -avP %1 %2
 
 # ---- git (--, ts/tg, glg, t1/t4)
 
@@ -233,7 +260,7 @@ fssum
 2f d	gpg -d
 # TODO: inplace enc/dec
 
-## crypdf:crypdf d|e infile outfile [other flags for enc], (password will be asked on STDIN)
+## crypdf:crypdf d|e infile outfile [other flags for enc], (password STDIN)
 # note: okular as of 2015-06-06 does not read 256 bit encrypted files so no point
 crypdf d % %	qpdf --empty --pages %1 --password=`cat` -- %2
 crypdf e	crypdf e
@@ -262,18 +289,18 @@ dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
 ## pdfpages:pdfpages M N infile outfile
 ## pdfopt:pdfopt infile outfile
 pdfpages % % % %	/usr/bin/gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dFirstPage=%1 -dLastPage=%2 -sOutputFile=%4 %3
-pdfopt % %	/usr/bin/gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%2 %1
+pdfopt % %	/usr/bin/gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%2 %1
 
 # ----
 # obsolete/unused/really really rarely used
 # also, cool tricks I may no longer need but don't want to forget!
 
-##  ## mg:mg [-p] words; each word smartcase, -word is -v, -p is -00
-##  xmg -p	xmg	$ENV{MG_PARA} = '-00';
-##  xmg %$	@__ _mg %1
-##  xmg % %%	@__ _mg %1 | __ xmg %2
-##  _mg -%	@perl $MG_PARA -lne 'print unless /%1/'	"%1" =~ /[A-Z]/
-##  _mg -%	@perl $MG_PARA -lne 'print unless /%1/i'
-##  _mg %	@perl $MG_PARA -lne 'print if     /%1/'	"%1" =~ /[A-Z]/
-##  _mg %	@perl $MG_PARA -lne 'print if     /%1/i'
+#  ## mg:mg [-p] words; each word smartcase, -word is -v, -p is -00
+#  xmg -p	xmg	$ENV{MG_PARA} = '-00';
+#  xmg %$	@__ _mg %1
+#  xmg % %%	@__ _mg %1 | __ xmg %2
+#  _mg -%	@perl $MG_PARA -lne 'print unless /%1/'	"%1" =~ /[A-Z]/
+#  _mg -%	@perl $MG_PARA -lne 'print unless /%1/i'
+#  _mg %	@perl $MG_PARA -lne 'print if     /%1/'	"%1" =~ /[A-Z]/
+#  _mg %	@perl $MG_PARA -lne 'print if     /%1/i'
 
