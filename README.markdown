@@ -25,6 +25,20 @@ as this **aa** code:
     mgrep
         @grep -i
 
+## teaser example: implicit command
+
+I got tired of typing 'geoiplookup' on suspicious IP addresses found in my
+logs.  My initial thought was to alias 'geoiplookup' to 'gl' or something, but
+the way I get those IP addresses is usually mouse driven so if I could just
+paste the IP and hit enter, that would be *great*!
+
+    (\d+\.\d+\.\d+\.\d+)$
+        @geoiplookup %1
+
+That's it!  Just drop an IP on the command line and hit enter.  (And yes I
+know that regex catches invalid IPs also; in this use I don't care.  I'm
+getting the IPs from a log file so they're already valid.)
+
 ## getting started
 
 There are two ways to use **aa**.  The first is to create a file called
