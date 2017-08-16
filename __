@@ -220,7 +220,7 @@ sub get_rules {
         my ($r, $c);
         $c = $1 if $p =~ s(\n    \?   (.*))()s;
         $r = $1 if $p =~ s(\n    (\S.*))()s;
-        die unless $r;  # 'repl' mandatory, 'cond' is not
+        die "format error: $p" unless $r;  # 'repl' mandatory, 'cond' is not
         # TODO: consider removing the indent from $r and $c, so that multi-line 'echo's work ok
         push @rules, [$p, $r, $c];
     }
