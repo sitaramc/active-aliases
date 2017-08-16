@@ -8,35 +8,14 @@
 # generic: is STDIN a pipe or a terminal? (side effect only; note the '0' at the end of the condition)
 %%	@die should not come here...	$ENV{_tty} = ( -t STDIN ? 1 : 0 ); 0
 
-# generic: make normal commands go through __ by prefixing with a "." (bloody
-# zsh takes over the _-prefixed versions)
+# generic: make normal commands go through __ by prefixing with a ".".  So,
+# running ".ls" (for example), will make the command and arguments go through
+# active aliases.  (I originally wanted to use the underscore as the prefix,
+# but for some reason zsh is unwilling to let me do that so I gave up).
 \.%	%1
 
-# ---- (first: LF/LL/Ym-/Ymd- since they affect everything else)
-
-## *:(dir/)?LF[1-9]?, (dir/)?LL[1-9]?, Ym-..., Ymd-...
-%% LF	%1 ./LF1.
-%% LF(\D\S+)	%1 ./LF1%2
-%% LF(\d)	%1 ./LF%2.
-%% LF(\d\S+)	%1 ./LF%2
-
-%% %/LF	%1 %2/LF1.
-%% %/LF(\D\S+)	%1 %2/LF1%3
-%% %/LF(\d)	%1 %2/LF%3.
-
-%% %/LF(\d)(\S+)	%1 %2/`cd %2 ;ls -trc|grep %4|tail -%3|head -1`
-
-%% LL	%1 ./LL1.
-%% LL(\D\S+)	%1 ./LL1%2
-%% LL(\d)	%1 ./LL%2.
-%% LL(\d\S+)	%1 ./LL%2
-
-%% %/LL	%1 %2/LL1.
-%% %/LL(\D\S+)	%1 %2/LL1%3
-%% %/LL(\d)	%1 %2/LL%3.
-
-%% %/LL(\d)(\S+)	%1 %2/`cd %2 ;ls|grep %4|tail -%3|head -1`
-
+# easily create files/directories with date stamps in them.  Example:
+#   .touch Ym-foo   # will create, for example, "2017-08-foo"
 %% Ym-%	%1 `date +%Y-%m-`%2
 %% Ymd-%	%1 `date +%Y-%m-%d-`%2
 
@@ -76,41 +55,6 @@ CP % // % %%
 CP % // %
     @__ $_AACMD %1 %2
 
-# ---- vim: vw/vm/vd/vr/vg
-
-## vw:vim which
-vw %%	$EDITOR `which %1`	$ENV{EDITOR}
-
-## vx:run vim on one-per-line file list (like 'xargs -d\\n' but without touching STDIN
-# vx is used in vm, vd, etc. but can also be used directly at the command line, as in:
-#   vx "`find | grep ' '`"
-# first, list mode.  Note we ignore %1 here and use the env vars that later code sets up
-vx %%	@echo -n "$_VX"	$ENV{_VX_LIST}
-# next, the actual execution (if the list mode env var was not set)
-# (the "treat newlines embedded in arguments as argument separators" logic makes this work)
-vx %%	vim %1
-
-v([mdr]) -l %%	v%1 %2	$ENV{_VX_LIST} = "-l"
-# user visible command (may have a -l as arg-1 also)
-## vm:vim mru (from viminfo)
-## vd:vim file in dir
-## vr:vim file in repo
-vm %%	@__ vx "$_VX"	$ENV{_VX} = `grep '^> ' ~/.viminfo | cut -c3- | mg %1`
-vd %%	@__ vx "$_VX"	$ENV{_VX} = `find . -name .git -prune -o -type f -print | mg %1`
-vr %%	@__ vx "$_VX"
-    ?   my $cdup = `git rev-parse --show-cdup`;
-        chomp $cdup; die "not at project root" if $cdup;
-        $ENV{_VX} = `git ls-tree -r --name-only HEAD | mg %1`
-
-## vg:vim Grep; vg [iw]* ==> -i/-w
-vg i w %%	vg -i -w %1
-vg iw %%	vg -i -w %1
-vg w i %%	vg -i -w %1
-vg wi %%	vg -i -w %1
-vg i %%	vg -i %1
-vg w %%	vg -w %1
-vg %%	$EDITOR -c 'Grep %1'	$ENV{EDITOR}
-
 # ---- text handling: ew, sort-p, InPlace, field, hdt, hd
 
 ## ew:ew pattern [paths] [-G include-glob ...]
@@ -139,12 +83,6 @@ hdt	perl -pe 's/^\d{5,}(\.\d+)?/localtime $&/e'
 ## hd:|hd; hexdump using od options
 hd	od -Ax -tx1z -v
 
-## tc:tc fold|unfold [historical, now that we have 'mg -p' and 'sort-p']
-# I have a lot of files where I use a leading tab as a continuation marker
-# (i.e., 'grep' etc should look at those lines as one logical line)
-tc fold$	@perl -0777 -pe "s/\n\t/<x0D>/g"
-tc unfold$	@perl -pe 's/<x0D>/\n\t/g'
-
 # ---- file handing: sf, ch, lf, tcp, tmv, xfr (rsync)
 ## sf:sf dirs -x N -f|-d|-l -t (mtime) -m (mmin) -s (size)
 # set up defaults
@@ -162,23 +100,12 @@ sf %% -m	sf %1 -mmin
 sf %% -s	sf %1 -size
 sf %% -x %	sf %1	$ENV{_MD} = "-maxdepth %2"
 # execute
-sf (.*?)( -.*)	find -H %1 $_MD -name .git -prune -o %2 -print
+sf (.*?)( -.*)	@find -H %1 $_MD -name .git -prune -o %2 -print
 
 ## ch:chmod; ch r ==> -R go+rx, w ==> u+w, x ==> +x
 ch r	chmod -R go+rX
 ch w	chmod u+w
 ch x	chmod +x
-
-# lf: <dir> <patt> <count>
-## lf:latest files, lf dir? patt? count? (only one or all 3; defaults . . 10)
-lf$	lf . . -10
-lf (\d+)$	lf . . -%1
-lf %$	lf %1 . -10	-d "%1"
-lf %$	lf . %1 -10
-# canonical form 1
-lf % \. -%	ls -Altrc "%1" | tail -%2
-# canonical form 2
-lf % % -%	ls -Altrc "%1" | grep -i %2 | tail -%3
 
 ## tcp:tcp file (copies file to /tmp, runs ch r on it, then arranges to have it disappear in 1 hour)
 ## tmv:tmv file (moved  file to /tmp, runs ch r on it, then arranges to have it disappear in 1 hour)
@@ -190,7 +117,6 @@ tmv %%/%	mv %1/%2 /tmp; __ ch r /tmp/%2 ; ( ( cd /tmp; sleep 1h; rm %2 ) & )
 tmv %	__ tmv ./%1
 
 ## xfr:xfr a [b]
-## putr:putr file remote:[dir]
 xfr %$	xfr %1 .
 xfr % %	rsync -avP %1 %2
 
@@ -210,11 +136,6 @@ tg CDRR	cd `git rev-parse --show-toplevel` ; tig
 ## glg:glg \d* ==> git lg -n(5)
 glg$	glg 5
 glg (\d+)$	git lg -%1 | less -R -F
-
-## t1
-t1 %	TSH_ERREXIT=1 TSH_VERBOSE=1 HARNESS_ACTIVE=1 "%1"
-## t4
-t4 %	TSH_ERREXIT=1 TSH_VERBOSE=4 HARNESS_ACTIVE=1 "%1"
 
 # ---- system (qf, qd, ql, fssum, flsum)
 
@@ -290,17 +211,4 @@ dot % %$	/usr/bin/dot -Tpng %1 -o %2; display %2 &
 ## pdfopt:pdfopt infile outfile
 pdfpages % % % %	/usr/bin/gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dFirstPage=%1 -dLastPage=%2 -sOutputFile=%4 %3
 pdfopt % %	/usr/bin/gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%2 %1
-
-# ----
-# obsolete/unused/really really rarely used
-# also, cool tricks I may no longer need but don't want to forget!
-
-#  ## mg:mg [-p] words; each word smartcase, -word is -v, -p is -00
-#  xmg -p	xmg	$ENV{MG_PARA} = '-00';
-#  xmg %$	@__ _mg %1
-#  xmg % %%	@__ _mg %1 | __ xmg %2
-#  _mg -%	@perl $MG_PARA -lne 'print unless /%1/'	"%1" =~ /[A-Z]/
-#  _mg -%	@perl $MG_PARA -lne 'print unless /%1/i'
-#  _mg %	@perl $MG_PARA -lne 'print if     /%1/'	"%1" =~ /[A-Z]/
-#  _mg %	@perl $MG_PARA -lne 'print if     /%1/i'
 
