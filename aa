@@ -13,24 +13,27 @@ $Data::Dumper::Terse = 1;
 $Data::Dumper::Useqq = 1;
 
 sub trace;
-
+my %share;
 my @queue;
+# the queue is one of the fundamental differences between this version of
+# active aliases and the previous one.  It basically allows one command to
+# spawn multiple commands as it is processed.  Yes it's useful.  I think :)
+
 setup();
 # deal with @ARGV, decide what rc files to use, and set up the queue
 
 while (@queue) {
+    dequeue();
+}
+
+# ----------------------------------------------------------------------
+
+sub dequeue {
     my @cmd   = @{ shift(@queue) };
     my @lines = @{ shift(@queue) };
     trace "dequeue: ", scalar(@lines), " lines, ", Dumper \@cmd;
-    # trace "dequeue: first line: ", $lines[0];
-    do_1( \@cmd, \@lines );
-}
-
-my %share;
-
-sub do_1 {
-    my @cmd = @{ +shift };
-    my @lines = @{ +shift };
+    # my @cmd = @{ +shift };
+    # my @lines = @{ +shift };
 
     while (my $line = nextline('patt', \@lines)) {
         last if /__END__/;
@@ -44,12 +47,18 @@ sub do_1 {
             # if the match succeeded, you get back a "tail", which is the list
             # of arguments left over after the command matched the pattern
             # (typically, a list of files to be processed), and a list of
-            # strings from matched groups in the pattern
+            # strings from matched "capture groups" in the pattern
             my @tail = @{ $res->[0] };
             my @groups = @{ $res->[1] };
             trace "cmd, tail, groups = ", Dumper \@cmd, \@tail, \@groups;
 
             my @subqueue = ();
+            # the purpose of the subqueue is that we push commands to it as
+            # they get queued while we process the command block, then we
+            # *unshift* the whole subqueue to the (front of) the main queue.
+            # Otherwise you get queueing inversions (e.g. q t1, q t2, but t1
+            # is actually t1a, t1b, t1c, and they all get queued, which means
+            # t2 runs before t1a/b/c)
 
             # now grab the "body", which is the optional "condition" (block of
             # perl code in a single string), and the list of (one or more)
@@ -59,7 +68,8 @@ sub do_1 {
             trace "ccr: ", Dumper $ccr;
 
             %share = ( 'cmd' => \@cmd, 'tail' => \@tail, 'groups' => \@groups );
-            sub get_stuff {
+            sub grab {
+                # allows the perl block to grab stuff from the current lexical scope
                 return @{ $share{shift()} };
             }
 
@@ -72,13 +82,7 @@ sub do_1 {
             # and now the commands...
             my @commands = @{ $ccr->[1] };
 
-            # if the first command is a "meta" command, then all of them have
-            # to be.  NOTE: we may have to rethink not allowing %metas to mix
-            # with normal commands, or at least add a %queue meta to help out,
-            # if we find queue inversions with %each.  Or find some other
-            # solution specific to %each.  (Or the user may get creative, by
-            # using yet another %each to un-invert the queue; see test suite
-            # item t13).
+            # if the first command is a "meta" command, then all of them have to be
             if ($commands[0] =~ /^%[a-z]+ /) {
                 for my $mc (@commands) {
                     # interpolate before sending the line off to meta().
@@ -88,12 +92,18 @@ sub do_1 {
                     @cmd = meta($mc, \@cmd, \@tail, \@subqueue);
                 }
 
-                # some metas, like %each and %shell, cannot continue
-                # processing (%each would have queued up other commands, and
-                # %shell would have actually *run* some commands
-
+                # some metas (like %each) would have added to the subqueue.
+                # Add each of those commands to the main queue, along with the
+                # required @lines ref.
                 unshift @queue, $_, [ @lines ] for reverse @subqueue;
+
+                # some metas, like %each and %shell, do not have a "final"
+                # command for us to continue processing (%each would have
+                # queued up other commands, and %shell would have actually
+                # *run* some commands).  For those, we just get out of dequeue
                 return unless @cmd;
+
+                # all other cases, we continue transforming the current @cmd
                 next;   # get out of this loop
             }
 
@@ -104,21 +114,25 @@ sub do_1 {
             for my $sc (@commands) {
                 if (0) {
                     # TBD; deal with "!"
-                    run($sc, \@tail, @groups);
+                    run_now($sc, \@tail, @groups);
                 } else {
                     # "processed by the rest of the rc lines" actually means
-                    # we add to the queue (remember the queue, at the top of
-                    # the program?)  This basically allows one command to
-                    # spawn multiple commands.  Yes it's useful.  I think :)
+                    # we add to the queue; see comments on 'queue' at the top.
                     my @newcmd = split(' ', $sc);
                     for my $c (@newcmd) {
                         $c = interpolate($c, @groups);
                     }
+
+                    # normally, the "tail" (described earlier) is tacked on to
+                    # the end of the new command.  However, sometimes a queued
+                    # command does not want that; if so, it ends the command
+                    # with a "%.", and then the tail won't be added to it.
                     if ($newcmd[-1] eq "%.") {
                         pop @newcmd;
                     } else {
                         push @newcmd, @tail;
                     }
+
                     push @subqueue, [ @newcmd ];
                 }
             }
@@ -128,7 +142,9 @@ sub do_1 {
         }
     }
 
-    # what's left in @cmd at this point is the end result
+    # what's left in @cmd at this point is what we need to run; this is *some*
+    # queued command that made it all the way through the remaining lines,
+    # without getting transformed.
     trace "final: ", Dumper \@cmd;
     _system(@cmd);
 }
@@ -136,8 +152,8 @@ sub do_1 {
 # match the current pattern with the current @cmd.  Returns an empty array if
 # match fails, otherwise [ \@tail, \@groups ], where @tail is the part of @cmd
 # that did not get used up in matching with the pattern, and @groups is the
-# combined list of matched sub-expressions, including those representing a "%"
-# (a whole word to be captured)
+# combined list of matched sub-expressions from all the capture groups,
+# including those representing a "%" (a whole word to be captured)
 sub match {
     my $patt = shift;
     my @cmd = @_;
@@ -152,11 +168,17 @@ sub match {
         my $l = shift @cmd;
         my $r = shift @patt;
 
+        # the purpose of "@" (which can only occur as the last word in a
+        # command) is to signify that a tail is **expected**.  It's kinda like
+        # a positive lookahead in regex, since it does not consume the
+        # corresponding word from the command (because we unshift it back)
         if ($r eq '@') {
             die "'@' must be the last item in pattern\n" if @patt;
             unshift @cmd, $l;
             last;   # @patt should be empty and @cmd, what's left of it, will be @tail
         }
+
+        # a "%" is of course a single word
         $r = '(.*)' if $r eq '%';
         my $rp = qr(^$r$);
 
@@ -184,7 +206,7 @@ sub match {
 # command+arguments in some way
 
 # meta commands in the rc file are special "escape" routines to do more
-# complex things that cannot be done directly
+# complex things that cannot be done directly in the user's rc file.
 sub meta {
     my $mc = shift;
     my @cmd = @{ shift() };
@@ -220,9 +242,9 @@ sub meta {
         return @newcmd;
     }
 
-    # "%each <command+args>" runs the command+args on each of the words in the
-    # "tail" (such as a list of files).  Useful when the command can't process
-    # multiple files at a time
+    # "%each <command+args>" runs, or rather queues up, the command+args on
+    # each of the words in the "tail" (such as a list of files).  Useful when
+    # the command can't process multiple files at a time
     if ($mc =~ /^%each (.*)/) {
         my @c = split ' ', $1;
         trace "each: ", Dumper \@c, \@tail;
@@ -238,6 +260,11 @@ sub meta {
     # (TBD: quote each member of @tail before joining)
     if ($mc =~ /^%shell (.*)/) {
         my $sc = $1;
+
+        # normally, the tail arguments are tacked on to the end.  But some
+        # commands may need the list at some other position.  This can be
+        # expressed as "%@" if required.  (E.g., where you need the command to
+        # run have the tail within quotes; see "vg" in test.aarc)
         if ($sc =~ /(.*)%@(.*)/) {
             $sc = $1 . join(" ", @tail) . $2;
         } else {
@@ -266,7 +293,7 @@ sub meta {
         return ($cmd, @args);
     }
 
-    # # XXX DO NOT USE UNTIL WE ARE SURE IT IS REALLY NEEDED, MAY BITROT XXX
+    # # XXX DO NOT USE UNTIL WE ARE SURE IT IS REALLY NEEDED XXX
     # # "%map <expr>" evaluates the perl expr for each word in the current
     # # command and replace with the result
     # if ($mc =~ /^%map (.*)/) {
@@ -283,12 +310,9 @@ sub meta {
     die "not a valid meta command";
 }
 
-# emulate shell, poorly :-)  Just $var, ${var}, and "~/" are handled for now.
+# emulate shell, poorly :-)  Just $$, $var, ${var}, and "~/" are handled
 sub shemulate {
     my @a = @_;
-    # mangle list_ to do some simple shell like substitutions; may break this
-    # out into its own sub if it gets much more complicated (like, if we start
-    # handling redirection or pipes!)
     map { s(\$\$)($$)g } @a;
     map { s(^~/)($ENV{HOME}/) } @a;
     map { s(\$(\w+))($ENV{$1})g } @a;
@@ -302,9 +326,61 @@ sub shemulate {
 # interpolate %1, %2, etc using matched groups found from match()
 sub interpolate {
     my $c = shift;
-    # that leaves @groups in @_;
+    # that leaves @groups in @_;  (and remember its first element is a dummy,
+    # to make 1-based indexing work for us)
     $c =~ s/%(\d+)/$_[$1]/gm;
     $c;
+}
+
+sub setup {
+    die "Usage: $0 command [args]\n" unless @ARGV;
+
+    # if the first character of the first word in the command is a dash, we
+    # have to remove it (see documentation); this allows you to trivially
+    # override real commands and force them to go through active-aliases
+    $ARGV[0] =~ s/^-//;
+
+    # treat newlines embedded in arguments as argument separators.  This lets
+    # you operate on file lists, such as the output of "`find ...`" (note the
+    # double quotes).
+    @ARGV = split("\n", join("\n", @ARGV));
+
+    # the queue always contains an even number of entries, the first a ref to
+    # the current command, and the second a ref to a list of rc lines to be
+    # processed.  The first pair comes from the command line arguments and the
+    # entire contents of the rc files.  During processing of this pair, more
+    # pairs can be pushed to the end of the queue (but it will eventually run
+    # out, not to worry!)
+    push @queue, [ @ARGV ];     # this becomes the initial command
+
+    # ----------------------------------------------------------------------
+    # what rc file do we use?
+
+    if ($ENV{AA_RC} and -f $ENV{AA_RC}) {
+        @ARGV = ($ENV{AA_RC});  # only the one file in this case
+    } else {
+        @ARGV = ();
+        # first, the one from the current directory, but only if it is within $HOME
+        push @ARGV, "$ENV{PWD}/.aarc" if $ENV{PWD} ne $ENV{HOME}
+                              and !index($ENV{PWD},   $ENV{HOME})
+                                 and -f "$ENV{PWD}/.aarc";
+        # next, the one in ~, and then the one in ~/.config (note the latter
+        # one is called "aarc" not ".aarc")
+        push @ARGV, grep { -f } ( "$ENV{HOME}/.aarc", "$ENV{HOME}/.config/aarc" );
+        # the overall idea is that the one in ~/.config will be on all your
+        # machines (if you have a "dot file" git repo, for instance, it will
+        # have this), and the one in your ~ will be specific to this user (for
+        # example user versus root, or if, like me, you use different userids
+        # for different tasks)
+    }
+    my @lines = <>;     # which, as you know, eats up @ARGV;
+    push @queue, \@lines;
+
+    # ----------------------------------------------------------------------
+    # setup some env vars and such, for convenience
+
+    $ENV{_tty} = ( -t ? 1 : 0 );
+
 }
 
 # ----------------------------------------------------------------------
@@ -312,8 +388,8 @@ sub interpolate {
 
 # return the next logical line.  When called with 'patt' as the argument,
 # return the next pattern line.  When called with 'blocks', return the
-# conditional block, if any, as a single string, followed by a reference to
-# the list of commands to run
+# conditional block, if any, as a single string, followed by the command block
+# (as a reference to the list of commands to run)
 sub nextline {
     my $want = shift;
     my $lines =shift;
@@ -367,8 +443,9 @@ sub _eval {
     return $rc;
 }
 
-# call system to run a command, but first interpolate()
-sub run {
+# system to run a command, but first interpolate(), because where this is
+# called, interpolate() has not happened
+sub run_now {
     my $c = shift;
     my $tail = shift;
     # that leaves @groups in @_
@@ -383,8 +460,7 @@ sub run {
 }
 
 # ----------------------------------------------------------------------
-# general purpose routines that came from elsewhere or could also go elsewere,
-# with a little bit of munging
+# general purpose routines
 
 sub get {
     my $lines = shift;
@@ -429,55 +505,4 @@ sub _system {
 sub trace {
     return unless $ENV{D};
     say STDERR "[$$] ", @_;
-}
-
-sub setup {
-    die "Usage: $0 command [args]\n" unless @ARGV;
-
-    # if the first character of the first word in the command is a dash, we
-    # have to remove it (see documentation); this allows you to trivially
-    # override real commands and force them to go through active-aliases
-    $ARGV[0] =~ s/^-//;
-
-    # treat newlines embedded in arguments as argument separators.  This lets
-    # you operate on file lists, such as the output of "`find ...`" (note the
-    # double quotes).
-    @ARGV = split("\n", join("\n", @ARGV));
-
-    # the queue always contains an even number of entries, the first a ref to
-    # the current command, and the second a ref to a list of rc lines to be
-    # processed.  The first pair comes from the command line arguments and the
-    # entire contents of the rc files.  During processing of this pair, more
-    # pairs can be pushed to the end of the queue (but it will eventually run
-    # out, not to worry!)
-    push @queue, [ @ARGV ];     # this becomes the initial command
-
-    # ----------------------------------------------------------------------
-    # what rc file do we use?
-
-    if ($ENV{AA_RC} and -f $ENV{AA_RC}) {
-        @ARGV = ($ENV{AA_RC});  # only the one file in this case
-    } else {
-        @ARGV = ();
-        # first, the one from the current directory, but only if it is within $HOME
-        push @ARGV, "$ENV{PWD}/.aarc" if $ENV{PWD} ne $ENV{HOME}
-                              and !index($ENV{PWD},   $ENV{HOME})
-                                 and -f "$ENV{PWD}/.aarc";
-        # next, the one in ~, and then the one in ~/.config (note the latter
-        # one is called "aarc" not ".aarc")
-        push @ARGV, grep { -f } ( "$ENV{HOME}/.aarc", "$ENV{HOME}/.config/aarc" );
-        # the overall idea is that the one in ~/.config will be on all your
-        # machines (if you have a "dot file" git repo, for instance, it will
-        # have this), and the one in your ~ will be specific to this user (for
-        # example user versus root, or if, like me, you use different userids
-        # for different tasks)
-    }
-    my @lines = <>;     # which, as you know, eats up @ARGV;
-    push @queue, \@lines;
-
-    # ----------------------------------------------------------------------
-    # setup some env vars and such, for convenience
-
-    $ENV{_tty} = ( -t ? 1 : 0 );
-
 }

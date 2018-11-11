@@ -161,7 +161,7 @@ _t13b_2
 ## hi there
 ## hi there
 t14 % %
-    ?   my @cmd = get_stuff('cmd');
+    ?   my @cmd = grab('cmd');
         shift @cmd; # should be "DO"
         my $sleep = shift @cmd;
         while (1) {
