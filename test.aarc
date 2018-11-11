@@ -210,6 +210,7 @@ vw %
 #> vd aa -test
 ## a=vim.
 ## a=./aa.
+## a=./sample.aarc.
 vd
     %args vx find . -name .git -prune -o -type f -print | mg
 vm
