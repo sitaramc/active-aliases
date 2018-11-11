@@ -3,6 +3,9 @@
 # this is a rudimentary test script for now; once the number of tests stops
 # changing every time I touch it, I'll add in TAP compliance
 
+# you'll probably need at least the "args" command in your path for this to
+# work, and maybe some others I missed.
+
 use 5.10.0;
 use strict;
 use warnings;
