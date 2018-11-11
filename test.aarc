@@ -1,0 +1,245 @@
+# ---- simple stuff
+#> t1 foo bar
+## this is foo in t1 bar
+#> t1 foo
+## this is foo in t1
+#> t1
+## this is t1
+t1 %
+    echo this is %1 in t1
+t1
+    echo this is t1
+
+# ---- chaining
+#> t2
+## this is t2 and baz bar
+#> t2 foo
+## this is t2 and baz bar foo
+#> t2 foo fighter
+## this is t2 and baz bar foo fighter
+t2
+    t2 bar
+t2
+    t2 baz
+t2
+    echo this is t2 and
+
+# ---- multiple commands
+#> t3
+## this is t3 line 1
+## this is t3 line 2
+t3
+    echo this is t3 line 1
+    echo this is t3 line 2
+
+# ---- multiple commands + chaining
+#> t4
+## this is t4 line 1
+## this is t4 line 2 bar
+## this is t4 ending bar
+t4
+    echo this is t4 line 1
+    t4 bar
+t4
+    echo this is t4 line 2
+    echo this is t4 ending
+
+# ---- force at least one tail argument
+#> t5
+## 
+t5 @
+    echo this is t5 line 1
+    echo this is t5 ending
+
+# ---- multiple commands + chaining + regex
+#> t6
+## t6 got nothing
+#> t6 abc
+## t6 got something: abc
+#> t6 1
+## t6 got number: 1
+#> t6 2
+## t6 got number: 2
+#> t6 12
+## t6 got number: 12
+t6 (\d+)
+    echo t6 got number: %1
+t6 %
+    echo t6 got something: %1
+t6
+    echo t6 got nothing
+
+# # ---- mangle, map
+# #> t7
+# ## /home/user bar
+# #> t7 foo
+# ## /home/user bar foo
+# t7
+#     t7 %HOME/bar
+# t7
+#     %map m(%HOME/(.*)) ? ("/home/user", $1) : $_
+# t7
+#     echo
+
+# ---- mangle, each
+#> t8 one two
+## this is one in t1
+## this is two in t1
+t8
+    _t8echo
+_t8echo
+    %each ./aa t1
+
+# ---- shell
+#> t9 .bashrc
+## /home/sitaram
+## /home/sitaram/.bashrc
+t9 %
+    ?   $ENV{FOO} = "%1"; 1
+    echo $HOME
+    ls ~/$FOO
+
+# ---- preamble + little shell + env var snippets; note the trailing "; :"
+#> t10
+## IS a tty
+#> t10 < /dev/null
+## not a tty
+t10
+    %shell [ $_tty = 1 ] && echo IS  a tty; :
+    %shell [ $_tty = 0 ] && echo not a tty; :
+
+#> t11
+## this message should show up
+t11
+    ?   0
+    echo this message should not show up
+t11
+    echo this message should show up
+
+# ---- %each
+#> t12 a b c
+## pre a post
+## pre b post
+## pre c post
+t12
+    %each _t12
+_t12 %
+    echo pre %1 post
+
+# ---- queue inversion
+#> t13a
+## 1e: a b c
+## 2: d
+t13a
+    _t13a_1 a b c
+    _t13a_2 d
+_t13a_1
+    _t13a_1e
+_t13a_1e
+    echo 1e:
+_t13a_2
+    echo 2:
+#> t13b
+## 1e: a
+## 1e: b
+## 1e: c
+## 2: d
+t13b
+    _t13b_1 a b c
+    _t13b_2 d
+_t13b_1
+    %each _t13b_1e
+_t13b_1e
+    echo 1e:
+_t13b_2
+    echo 2:
+
+# ---- watch
+#> t14 1 echo hi there | head -4
+## hi there
+## hi there
+## hi there
+## hi there
+t14 % %
+    ?   my @cmd = get_stuff('cmd');
+        shift @cmd; # should be "DO"
+        my $sleep = shift @cmd;
+        while (1) {
+            _system(@cmd);
+            # sleep $sleep;
+        }
+        1
+    echo you will never reach this line
+
+# ---- %s
+#> t15 d4 u5
+## slow -d 4 -u 5
+#> t15 u5 d4
+## slow -u 5 -d 4
+t15
+    %s ([ud])(\d+) %with -%1 %2
+t15
+    echo slow
+
+# ---- cartesian product
+#> t16 a b // c d
+## a c
+## a d
+## b c
+## b d
+# item 2 is a separator
+t16 % // % @
+    echo %1 %2 %.
+    ./aa t16 %1 //
+t16 % // %
+    echo %1 %2
+# item 2 is not a separator
+t16 % %
+    ./aa t16 %1
+    ./aa t16 %2
+
+# ---- %shell with arguments
+#> vw ls
+## a=vw:.
+## a=vim.
+## a=/usr/bin/ls.
+vw %
+    %shell args vw: $EDITOR `which %1`
+
+# ---- %args, with implicit tail placement
+#> vd aa -test
+## a=vim.
+## a=./aa.
+vd
+    %args vx find . -name .git -prune -o -type f -print | mg
+vm
+    %args vx grep '^> ' ~/.viminfo | cut -c3- | mg
+# "vr" may need some testing; but we haven't used it in years, so maybe later!
+
+# ---- %shell with %@ and explicit tail placement
+#> vg i creator
+## a=vg:.
+## a=vim.
+## a=-c.
+## a=Grep -i creator.
+vg
+    %s i %with -i
+    %s w %with -w
+    %s iw %with -i -w
+    %s wi %with -i -w
+vg
+    %shell args vg: $EDITOR -c 'Grep %@'
+
+vx
+    args vim
+
+# ---- vdd
+#> vdd aa bb
+## a=vdd:.
+## a=vim.
+## a=-c.
+## a=syntax off.
+## a=-c.
+## a=DirDiff aa bb.
+vdd % %
+    %shell args vdd: vim -c 'syntax off' -c 'DirDiff %1 %2'
