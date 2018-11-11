@@ -207,7 +207,7 @@ vw %
     %shell args vw: $EDITOR `which %1`
 
 # ---- %args, with implicit tail placement
-#> vd aa -test
+#> vd aa -test -swp
 ## a=vim.
 ## a=./aa.
 ## a=./sample.aarc.
