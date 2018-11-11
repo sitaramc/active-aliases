@@ -373,14 +373,29 @@ sub setup {
         # example user versus root, or if, like me, you use different userids
         # for different tasks)
     }
+
     my @lines = <>;     # which, as you know, eats up @ARGV;
     push @queue, \@lines;
+
+    # check if shell completion command requested
+    _commands();    # this does not return; exits after doing its thing
 
     # ----------------------------------------------------------------------
     # setup some env vars and such, for convenience
 
     $ENV{_tty} = ( -t ? 1 : 0 );
 
+}
+
+sub _commands {
+    my @cmd  = @{ $queue[0] };
+    return unless @cmd == 1 and $cmd[0] eq '_commands';
+    my $lines = $queue[1];
+    for (@$lines) {
+        print if s/^## (\w+:)/$1/;
+    }
+
+    exit 0;
 }
 
 # ----------------------------------------------------------------------
