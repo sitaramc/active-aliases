@@ -430,6 +430,7 @@ sub trace {
 }
 
 sub setup {
+    die "Usage: $0 command [args]\n" unless @ARGV;
 
     # if the first character of the first word in the command is a dash, we
     # have to remove it (see documentation); this allows you to trivially
