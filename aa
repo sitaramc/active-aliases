@@ -2,7 +2,6 @@
 # TODO:
 #   help system
 #   should we use the cond result in the command as %?
-#   "-x" mode if the final command that is run, starts with "+ "
 #   finish the documentation, including translating all the examples to the new syntax
 use strict;
 use warnings;
@@ -406,7 +405,10 @@ sub unget {
 # run a command, but first shemulate()
 sub _system {
     @_ = shemulate(@_) unless @_ > 2 and $_[0] eq 'sh' and $_[1] eq '-c';
-    print STDERR join(" ", "+", @_) . "\n" if defined $ENV{D};
+    if ($_[0] eq '+') {
+        shift @_;
+        say STDERR join(" ", "+", @_);
+    }
 
     # run system(), catch errors.  Be verbose only if $ENV{D} exists.  If not,
     # exit with <rc of system()> if it applies, else just "exit 1".
