@@ -244,3 +244,42 @@ vx
 ## a=DirDiff aa bb.
 vdd % %
     %shell args vdd: vim -c 'syntax off' -c 'DirDiff %1 %2'
+
+# ---- ew
+# for this test, we pretend rg does not exist and go straight to egrep
+#> ew dd
+## a=grep.
+## a=-E.
+## a=etc....
+## a=-r.
+## a=-i.
+## a=dd.
+#> ew dD
+## a=grep.
+## a=-E.
+## a=etc....
+## a=-r.
+## a=dD.
+#> ew dD </dev/null
+## a=grep.
+## a=-E.
+## a=etc....
+## a=dD.
+#> ew dd </dev/null
+## a=grep.
+## a=-E.
+## a=etc....
+## a=-i.
+## a=dd.
+# ew
+#     ?   -x "/usr/bin/rg" or -x "/usr/local/bin/rg" or -x "$ENV{HOME}/bin/rg"
+#     args rg -uu -g '!.git' -S
+ew %
+    ?   "%1" !~ /[A-Z]/
+    ew -i %1
+ew
+    ?   $ENV{_tty}
+    ew -r
+ew
+    args grep -E etc...
+
