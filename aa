@@ -121,8 +121,18 @@ sub dequeue {
                     # we add to the queue; see comments on 'queue' at the top.
                     my @newcmd = split(' ', $sc);
                     for my $c (@newcmd) {
-                        $c = interpolate($c, @groups);
+                        # solo "%1", etc., can be directly substituted.  But
+                        # that's not the real reason why we're doing this;
+                        # it's because that %1 may be a **ref**, coming from
+                        # matching a "%%".
+                        if ($c =~ /^%(\d+)$/) {
+                            $c = $groups[$1];   # either a scalar or a ref
+                        } else {
+                            $c = interpolate($c, @groups);
+                        }
                     }
+                    # flatten the list, in case some of them were refs (due to %%)
+                    @newcmd = map { ref($_) ? @{ $_ } : $_ } @newcmd;
 
                     # normally, the "tail" (described earlier) is tacked on to
                     # the end of the new command.  However, sometimes a queued
@@ -163,8 +173,12 @@ sub match {
     my @groups = qw(dummy);
     # start with a dummy so indexing of the actual matched groups can be 1-based
 
-    # the left side is the current command, right side is the pattern.  Go
-    # through them item by item (or "word by word", if you will)
+    # first, a "%" all by itself in @patt is syntactic sugar for a single word
+    map { $_ = '(.*)' if $_ eq '%' } @patt;
+
+    # matching: the left side is the current command, right side is the
+    # pattern.  Go through them item by item (or "word by word", if you will)
+
     while (@cmd and @patt) {
         my $l = shift @cmd;
         my $r = shift @patt;
@@ -179,8 +193,6 @@ sub match {
             last;   # @patt should be empty and @cmd, what's left of it, will be @tail
         }
 
-        # a "%" is of course a single word
-        $r = '(.*)' if $r eq '%';
         my $rp = qr(^$r$);
 
         if ($l eq $r) {
@@ -189,7 +201,29 @@ sub match {
             # redo match in list context
             my @g = ($l =~ /$rp/);
             # @g = () if (@g == 1 and $g[0] eq "1"); # no parens; perl returns qw(1)
+            # push the matched capture groups into @groups
             push @groups, @g if @g;
+
+        } elsif ($r eq '%%') {
+            # try to match a '%%' in the @patt with as many words from @cmd as
+            # you can.  NOTE that the %% CANNOT be the last item in @patt;
+            # there has to be something else afterward.
+            my $i = 0;
+            my $p = $patt[0];   # the next word in the pattern, after the "%%" we're at
+            while ($i < @cmd) {
+                last if $cmd[$i] eq $p or $cmd[$i] =~ /$p/;
+                $i++;
+            }
+            if ($i < @cmd) {
+                # since a single %% can match more than one word in @cmd, we
+                # push them into @groups as a ref of an array rather than a
+                # single scalar value.
+                push @groups, [ $l, @cmd[ 0..$i-1 ] ];
+                splice(@cmd, 0, $i);
+            } else {
+                return ()
+            }
+
         } else {
             return ();
         }
