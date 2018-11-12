@@ -219,7 +219,7 @@ sub meta {
     # except it is word by word, and the replacement can be more then one
     # word.  Note that @cmd includes @tail, so we don't have to treat tail
     # separately
-    if ($mc =~ /^%s (.*) %with (.*)/) {
+    if ($mc =~ /^%s +(.*?) +%with +(.*)/) {
         my $f = $1;
         my @t = split ' ', $2;
         trace "pre-%s: ", Dumper $mc, $f, \@t;
@@ -245,7 +245,7 @@ sub meta {
     # "%each <command+args>" runs, or rather queues up, the command+args on
     # each of the words in the "tail" (such as a list of files).  Useful when
     # the command can't process multiple files at a time
-    if ($mc =~ /^%each (.*)/) {
+    if ($mc =~ /^%each +(.*)/) {
         my @c = split ' ', $1;
         trace "each: ", Dumper \@c, \@tail;
         for (@tail) {
@@ -258,7 +258,7 @@ sub meta {
     # This is potentially dangerous if the files have shell-unsafe names, but
     # sometimes you gotta do what you gotta do!  We also append the tail...
     # (TBD: quote each member of @tail before joining)
-    if ($mc =~ /^%shell (.*)/) {
+    if ($mc =~ /^%shell +(.*)/) {
         my $sc = $1;
 
         # normally, the tail arguments are tacked on to the end.  But some
@@ -278,7 +278,7 @@ sub meta {
     # "%args <cmd> <expr>" runs the expr as a shell command, captures the output,
     # and uses that as the new argument list (new-line separated, not space
     # separated; i.e., one argument per line.  Tail handling is same as %shell
-    if ($mc =~ /^%args (\S+) (.*)/) {
+    if ($mc =~ /^%args +(\S+) (.*)/) {
         my $cmd = $1;
         my $sc = $2;
         if ($sc =~ /(.*)%@(.*)/) {
@@ -296,7 +296,7 @@ sub meta {
     # # XXX DO NOT USE UNTIL WE ARE SURE IT IS REALLY NEEDED XXX
     # # "%map <expr>" evaluates the perl expr for each word in the current
     # # command and replace with the result
-    # if ($mc =~ /^%map (.*)/) {
+    # if ($mc =~ /^%map +(.*)/) {
     #     my $e = $1;
     #     @cmd = map { eval $e } @cmd;
     #     # # for (@cmd) {
