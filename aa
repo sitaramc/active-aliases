@@ -87,8 +87,7 @@ sub dequeue {
             if ($commands[0] =~ /^%[a-z]+ /) {
                 for my $mc (@commands) {
                     # interpolate before sending the line off to meta().
-                    # Except for %s, which has/needs its own internal one
-                    $mc = interpolate($mc, @groups) unless $mc =~ /^%s /;
+                    $mc = interpolate($mc, @groups);
 
                     @cmd = meta($mc, \@cmd, \@tail, \@subqueue);
                 }
@@ -250,33 +249,6 @@ sub meta {
     my $subqueue = shift;
 
     trace "meta: mc = $mc";
-
-    # "%s <expr> %with <expr>" does pretty much the equivalent of s/foo/bar/,
-    # except it is word by word, and the replacement can be more then one
-    # word.  Note that @cmd includes @tail, so we don't have to treat tail
-    # separately
-    if ($mc =~ /^%s +(.*?) +%with +(.*)/) {
-        my $f = $1;
-        my @t = split ' ', $2;
-        trace "pre-%s: ", Dumper $mc, $f, \@t;
-        trace "pre-%s: ", Dumper \@cmd;
-
-        my @newcmd = ();
-        for (@cmd) {
-            if (/^$f$/) {
-                my @g = (/^$f$/);
-                unshift @g, ''; # make it 1-relative for interpolate()
-                for my $t (@t) {
-                    push @newcmd, interpolate($t, @g);
-                }
-            } else {
-                push @newcmd, $_;
-            }
-        }
-
-        trace "%s: " . join("|", @newcmd);
-        return @newcmd;
-    }
 
     # "%each <command+args>" runs, or rather queues up, the command+args on
     # each of the words in the "tail" (such as a list of files).  Useful when
