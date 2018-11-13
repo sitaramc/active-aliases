@@ -111,12 +111,12 @@ sub dequeue {
             # -- if the first character is a "!" -- a command to be executed
             # immediately.
             for my $sc (@commands) {
-                if (0) {
-                    # TBD; deal with "!"
-                    run_now($sc, \@tail, @groups);
-                } else {
-                    my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
+                my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
 
+                if ($newcmd[0] eq '!') {
+                    shift @newcmd;
+                    _system(@newcmd);
+                } else {
                     # "processed by the rest of the rc lines" actually means
                     # we add to the queue; see comments on 'queue' at the top.
                     push @subqueue, [ @newcmd ];
@@ -469,22 +469,6 @@ sub _eval {
     return $rc;
 }
 
-# system to run a command, but first interpolate(), because where this is
-# called, interpolate() has not happened
-sub run_now {
-    my $c = shift;
-    my $tail = shift;
-    # that leaves @groups in @_
-
-    my @c = split(' ', $c);
-    for my $c (@c) {
-        $c = interpolate($c, \@_);
-    }
-
-    trace "run: ", Dumper \@c, $tail;
-    _system(@c, @$tail);
-}
-
 # ----------------------------------------------------------------------
 # general purpose routines
 
@@ -521,7 +505,16 @@ sub _system {
 
     # run system(), catch errors.  Be verbose only if $ENV{D} exists.  If not,
     # exit with <rc of system()> if it applies, else just "exit 1".
-    if ( system(@_) != 0 ) {
+
+    my $rc;
+    if ($_[0] eq 'exec') {
+        shift;
+        $rc = exec(@_);
+    } else {
+        $rc = system(@_);
+    }
+
+    if ( $rc != 0 ) {
         say STDERR "system() failed: ", join(" ", @_), " -> $?";
         if ( $? == -1 ) {
             die "failed to execute: $!\n" if $ENV{D};

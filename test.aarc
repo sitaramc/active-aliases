@@ -160,16 +160,10 @@ _t13b_2
 ## hi there
 ## hi there
 ## hi there
-t14 % %
-    ?   my @cmd = grab('cmd');
-        shift @cmd; # should be "DO"
-        my $sleep = shift @cmd;
-        while (1) {
-            _system(@cmd);
-            # sleep $sleep;
-        }
-        1
-    echo you will never reach this line
+t14 (\d+) %%
+    %2
+    # sleep %1
+    exec aa t14 %1 %2
 
 # ---- %s
 #> t15 a1 d4
