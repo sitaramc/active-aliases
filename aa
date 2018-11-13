@@ -86,8 +86,11 @@ sub dequeue {
             # if the first command is a "meta" command, then all of them have to be
             if ($commands[0] =~ /^%[a-z]+ /) {
                 for my $mc (@commands) {
-                    # interpolate before sending the line off to meta().
-                    $mc = interpolate($mc, @groups);
+                    # interpolate before sending the line off to meta().  For
+                    # '%each', we DON'T want the tail being added, so we
+                    # signal that to interpolate; see docs for "%."
+                    $mc .= " %." if $mc =~ /^%each /;
+                    $mc = interpolate($mc, \@groups, \@tail);
 
                     @cmd = meta($mc, \@cmd, \@tail, \@subqueue);
                 }
@@ -116,33 +119,10 @@ sub dequeue {
                     # TBD; deal with "!"
                     run_now($sc, \@tail, @groups);
                 } else {
+                    my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
+
                     # "processed by the rest of the rc lines" actually means
                     # we add to the queue; see comments on 'queue' at the top.
-                    my @newcmd = split(' ', $sc);
-                    for my $c (@newcmd) {
-                        # solo "%1", etc., can be directly substituted.  But
-                        # that's not the real reason why we're doing this;
-                        # it's because that %1 may be a **ref**, coming from
-                        # matching a "%%".
-                        if ($c =~ /^%(\d+)$/) {
-                            $c = $groups[$1];   # either a scalar or a ref
-                        } else {
-                            $c = interpolate($c, @groups);
-                        }
-                    }
-                    # flatten the list, in case some of them were refs (due to %%)
-                    @newcmd = map { ref($_) ? @{ $_ } : $_ } @newcmd;
-
-                    # normally, the "tail" (described earlier) is tacked on to
-                    # the end of the new command.  However, sometimes a queued
-                    # command does not want that; if so, it ends the command
-                    # with a "%.", and then the tail won't be added to it.
-                    if ($newcmd[-1] eq "%.") {
-                        pop @newcmd;
-                    } else {
-                        push @newcmd, @tail;
-                    }
-
                     push @subqueue, [ @newcmd ];
                 }
             }
@@ -264,20 +244,12 @@ sub meta {
 
     # "%shell <shell command>" runs the command supplied as a shell command.
     # This is potentially dangerous if the files have shell-unsafe names, but
-    # sometimes you gotta do what you gotta do!  We also append the tail...
-    # (TBD: quote each member of @tail before joining)
+    # sometimes you gotta do what you gotta do!  (TBD: interpolate() may need
+    # to quote each member of tail before joining, which may be hard.  Best
+    # use this only for safe filenames, and for others, use a wrapper!
     if ($mc =~ /^%shell +(.*)/) {
         my $sc = $1;
 
-        # normally, the tail arguments are tacked on to the end.  But some
-        # commands may need the list at some other position.  This can be
-        # expressed as "%@" if required.  (E.g., where you need the command to
-        # run have the tail within quotes; see "vg" in test.aarc)
-        if ($sc =~ /(.*)%@(.*)/) {
-            $sc = $1 . join(" ", @tail) . $2;
-        } else {
-            $sc = join(" ", $1, @tail);
-        }
         trace "shell ", Dumper $sc;
         _system("sh", "-c", $sc);
         return ();
@@ -331,12 +303,49 @@ sub shemulate {
     return @a;
 }
 
-# interpolate %1, %2, etc using matched groups found from match()
+# interpolate %1, %2, etc using matched groups found from match().  note that
+# some calls do not supply a tail at all, so you need to check for that too
 sub interpolate {
-    my $c = shift;
-    # that leaves @groups in @_
-    $c =~ s/%(\d+)/$_[$1]/gm;
-    $c;
+    my ($cmd, $groups, $tail) = @_;
+
+    # allow passing in a string to be interpolated, as opposed to an array
+    if (not ref($cmd)) {
+        my @cmd = interpolate([ split(' ', $cmd) ], $groups, $tail);
+        return join(" ", @cmd);
+    }
+
+    # a %. at the end says "don't attach the tail to me please!"
+    if ($cmd->[-1] eq '%.') {
+        pop @$cmd;
+        undef $tail;
+    }
+
+    my @ret;
+    for my $w (map $_, @$cmd) {
+        if ($w =~ /^%(\d+)$/) {
+            $w = $groups->[$1];
+            if (ref($w)) {
+                # result of matching "%%" is a list-ref; expand it and push
+                push @ret, @$w;
+            } else {
+                push @ret, $w;
+            }
+        } elsif ($w eq '%@') {
+            # explicit positioning of the tail.  Logical conflict with %., but
+            # at the moment we don't detect/warn if both are used.
+            push @ret, @$tail;
+            undef $tail;
+        } else {
+            $w =~ s/%(\d+)/$groups->[$1]/g;
+            $tail and ref($tail) and $w =~ s/%@/join(" ", @$tail)/ge and undef $tail;
+            push @ret, $w;
+        }
+    }
+
+    # otherwise, by default, attach the tail (if it exists) at the end
+    push @ret, @$tail if $tail and ref($tail);
+
+    return @ret;
 }
 
 sub setup {
@@ -458,7 +467,9 @@ sub _eval {
     my $e = shift;      # expression
     # that leaves @groups in @_
 
-    $e = interpolate($e, @_);
+    # wrap $e in an array (and unwrap the result) because interpolate will do
+    # nasty things to perl code if you send in a string!
+    $e = (interpolate([$e], \@_))[0];
 
     trace "eval: $e";
     my $rc = eval $e;
@@ -475,7 +486,7 @@ sub run_now {
 
     my @c = split(' ', $c);
     for my $c (@c) {
-        $c = interpolate($c, @_);
+        $c = interpolate($c, \@_);
     }
 
     trace "run: ", Dumper \@c, $tail;
