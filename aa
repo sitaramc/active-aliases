@@ -181,10 +181,15 @@ sub match {
 
         } elsif ($r eq '%%') {
             # try to match a '%%' in the @patt with as many words from @cmd as
-            # you can.  NOTE that the %% CANNOT be the last item in @patt;
-            # there has to be something else afterward.
+            # you can
             my $i = 0;
             unshift @cmd, $l;
+            if (! @patt) {
+                # that %% was the last token; all of @cmd matches
+                push @groups, [ @cmd ];
+                @cmd = ();
+                last;
+            }
             my $p = $patt[0];   # the next word in the pattern, after the "%%" we're at
             while ($i < @cmd) {
                 last if $cmd[$i] eq $p or $cmd[$i] =~ /$p/;
