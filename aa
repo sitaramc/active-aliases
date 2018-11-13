@@ -520,6 +520,13 @@ sub get {
         return "" unless @$lines;
         $r = shift @$lines;
     }
+
+    # support old syntax, at least for pattern+replacement (not pattern+replacement+condition)
+    if ($r =~ /(.*)\t(.*)/) {
+        unshift @$lines, "    $2";
+        $r = $1;
+    }
+
     return $r;
 }
 sub unget {
