@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-$ENV{AA_RC} = "test.aarc";
+$ENV{AA_RC} ||= "test.aarc";
 # if argv exists, just run that; we're not really testing, rather just using
 # this script to set up AA_RC for convenience
 if (@ARGV) {
