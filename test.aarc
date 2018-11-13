@@ -172,12 +172,22 @@ t14 % %
     echo you will never reach this line
 
 # ---- %s
+#> t15 a1 d4
+## slow a1 -d 4
+#> t15 d4 e5
+## slow -d 4 e5
+#> t15 a1 u4
+## slow a1 -u 4
+#> t15 u4 e5
+## slow -u 4 e5
 #> t15 d4 u5
 ## slow -d 4 -u 5
 #> t15 u5 d4
 ## slow -u 5 -d 4
-t15
-    %s ([ud])(\d+) %with -%1 %2
+t15 %% u(\d+)
+    t15 %1 -u %2
+t15 %% d(\d+)
+    t15 %1 -d %2
 t15
     echo slow
 
@@ -223,11 +233,14 @@ vm
 ## a=vim.
 ## a=-c.
 ## a=Grep -i creator.
-vg
-    %s i %with -i
-    %s w %with -w
-    %s iw %with -i -w
-    %s wi %with -i -w
+vg %% i
+    vg %1 -i
+vg %% w
+    vg %1 -w
+vg %% iw
+    vg %1 -i -w
+vg %% wi
+    vg %1 -i -w
 vg
     %shell args vg: $EDITOR -c 'Grep %@'
 

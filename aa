@@ -209,6 +209,7 @@ sub match {
             # you can.  NOTE that the %% CANNOT be the last item in @patt;
             # there has to be something else afterward.
             my $i = 0;
+            unshift @cmd, $l;
             my $p = $patt[0];   # the next word in the pattern, after the "%%" we're at
             while ($i < @cmd) {
                 last if $cmd[$i] eq $p or $cmd[$i] =~ /$p/;
@@ -218,7 +219,7 @@ sub match {
                 # since a single %% can match more than one word in @cmd, we
                 # push them into @groups as a ref of an array rather than a
                 # single scalar value.
-                push @groups, [ $l, @cmd[ 0..$i-1 ] ];
+                push @groups, [ @cmd[ 0..$i-1 ] ];
                 splice(@cmd, 0, $i);
             } else {
                 return ()
