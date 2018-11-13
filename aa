@@ -82,24 +82,14 @@ sub dequeue {
             # if the first command is a "meta" command, then all of them have to be
             if ($commands[0] =~ /^%[a-z]+ /) {
                 for my $mc (@commands) {
-                    # interpolate before sending the line off to meta().  For
-                    # '%each', we DON'T want the tail being added, so we
-                    # signal that to interpolate; see docs for "%."
-                    $mc .= " %." if $mc =~ /^%each /;
+                    # interpolate before sending the line off to meta()
                     $mc = interpolate($mc, \@groups, \@tail);
 
-                    @cmd = meta($mc, \@cmd, \@tail, \@subqueue);
+                    @cmd = meta($mc, \@cmd, \@tail);
                 }
 
-                # some metas (like %each) would have added to the subqueue.
-                # Add each of those commands to the main queue, along with the
-                # required @lines ref.
-                unshift @queue, $_, [ @lines ] for reverse @subqueue;
-
-                # some metas, like %each and %shell, do not have a "final"
-                # command for us to continue processing (%each would have
-                # queued up other commands, and %shell would have actually
-                # *run* some commands).  For those, we just get out of dequeue
+                # some metas, like %shell, do not have a "final" command for
+                # us to continue processing, so just get out of dequeue
                 return unless @cmd;
 
                 # all other cases, we continue transforming the current @cmd
@@ -227,21 +217,8 @@ sub meta {
     my $mc = shift;
     my @cmd = @{ shift() };
     my @tail = @{ shift() };
-    my $subqueue = shift;
 
     trace "meta: mc = $mc";
-
-    # "%each <command+args>" runs, or rather queues up, the command+args on
-    # each of the words in the "tail" (such as a list of files).  Useful when
-    # the command can't process multiple files at a time
-    if ($mc =~ /^%each +(.*)/) {
-        my @c = split ' ', $1;
-        trace "each: ", Dumper \@c, \@tail;
-        for (@tail) {
-            push @$subqueue, [ @c, $_ ];
-        }
-        return ();
-    }
 
     # "%shell <shell command>" runs the command supplied as a shell command.
     # This is potentially dangerous if the files have shell-unsafe names, but
@@ -269,20 +246,6 @@ sub meta {
         trace "args: ", Dumper \@args;
         return (split(' ', $prefix), @args);
     }
-
-    # # XXX DO NOT USE UNTIL WE ARE SURE IT IS REALLY NEEDED XXX
-    # # "%map <expr>" evaluates the perl expr for each word in the current
-    # # command and replace with the result
-    # if ($mc =~ /^%map +(.*)/) {
-    #     my $e = $1;
-    #     @cmd = map { eval $e } @cmd;
-    #     # # for (@cmd) {
-    #     # #     my $rc = eval $e;
-    #     # #     die $@ unless defined($rc);
-    #     # # }
-    #     trace "post-map: ", Dumper \@cmd;
-    #     return @cmd;
-    # }
 
     die "not a valid meta command";
 }
@@ -508,6 +471,9 @@ sub _system {
 
     my $rc;
     if ($_[0] eq 'exec') {
+        # XXX warn in docs about any subsequent queued items going bye-bye!
+        # (Or better yet, since the @queue is file scoped, detect if there are
+        # more commands and warn the user!
         shift;
         $rc = exec(@_);
     } else {

@@ -85,10 +85,14 @@ t6
 #> t8 one two
 ## this is one in t1
 ## this is two in t1
-t8
-    _t8echo
-_t8echo
-    %each ./aa t1
+t8 % %%
+    _t8_do1 %1
+    exec aa t8 %2
+t8 %
+    _t8_do1 %1
+
+_t8_do1 %
+    aa t1 %1
 
 # ---- shell
 #> t9 .bashrc
@@ -121,8 +125,11 @@ t11
 ## pre a post
 ## pre b post
 ## pre c post
-t12
-    %each _t12
+t12 % %%
+    _t12 %1
+    exec aa t12 %2
+t12 %
+    _t12 %1
 _t12 %
     echo pre %1 post
 
@@ -147,11 +154,32 @@ _t13a_2
 t13b
     _t13b_1 a b c
     _t13b_2 d
-_t13b_1
-    %each _t13b_1e
+_t13b_1 % %%
+    _t13b_1e %1
+    # this one is dangerous if the number of arguments are too many
+    aa _t13b_1 %2
+_t13b_1 %
+    _t13b_1e %1
 _t13b_1e
     echo 1e:
 _t13b_2
+    echo 2:
+#> t13c
+## 1e: a
+## 1e: b
+## 1e: c
+t13c
+    _t13c_1 a b c
+    # this one doesn't run!  XXX warning in docs needed
+    _t13c_2 d
+_t13c_1 % %%
+    _t13c_1e %1
+    exec aa _t13c_1 %2
+_t13c_1 %
+    _t13c_1e %1
+_t13c_1e
+    echo 1e:
+_t13c_2
     echo 2:
 
 # ---- watch
