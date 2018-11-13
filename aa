@@ -307,7 +307,7 @@ sub meta {
         }
         trace "shell ", Dumper $sc;
         _system("sh", "-c", $sc);
-        return qw(true);
+        return ();
     }
 
     # "%args <cmd> <expr>" runs the expr as a shell command, captures the output,
