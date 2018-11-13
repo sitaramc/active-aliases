@@ -22,6 +22,12 @@ open(STDERR, ">", "/dev/null");
 
 @ARGV = ($ENV{AA_RC});
 
+# the test script assumes this; don't worry, no editor is invoked within the test!
+$ENV{EDITOR} = "vim";
+# the test script uses some scripts that are not standard, but I use heavily;
+# make them available to the test script
+$ENV{PATH} = "$ENV{PWD}/test-helpers:" . $ENV{PATH}.
+
 my ($t, $er);   # test, expected result
 while (<>) {
     last if /^__END__/;
@@ -46,6 +52,10 @@ if ($t) {
 my $count;
 sub run_test {
     my ($t, $er) = @_;
+
+    # some kludges for now
+    $er =~ s(/home/sitaram)(/home/$ENV{USER})g;
+
     my $fwt = $t; $fwt =~ s/ .*//; chomp($fwt); # first word of test command
     $count++;
     $er = '' if $er eq "\n";

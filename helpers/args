@@ -1,0 +1,5 @@
+#!/bin/bash
+for a
+do
+    echo a=$a.
+done
