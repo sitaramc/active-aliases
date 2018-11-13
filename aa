@@ -1,8 +1,4 @@
 #!/usr/bin/perl
-# TODO:
-#   help system
-#   should we use the cond result in the command as %?
-#   finish the documentation, including translating all the examples to the new syntax
 use strict;
 use warnings;
 use 5.10.0;
@@ -547,3 +543,11 @@ sub trace {
     return unless $ENV{D};
     say STDERR "[$$] ", @_;
 }
+
+__END__
+
+to be tested
+    %0 as a replacement for perl block output
+    perl block sending out a complete @cmd
+    %% in all its glory
+    use %% to implement LC, FN, etc -- MUST BE SIMPLE!!!

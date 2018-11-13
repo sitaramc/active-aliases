@@ -208,7 +208,7 @@ t16 % %
     ./aa t16 %1
     ./aa t16 %2
 
-# ---- %shell with arguments
+# ---- %shell with shell variables and arguments within backquotes
 #> vw ls
 ## a=vw:.
 ## a=vim.
