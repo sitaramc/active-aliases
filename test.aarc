@@ -217,15 +217,18 @@ vw %
     %shell args vw: $EDITOR `which %1`
 
 # ---- %args, with implicit tail placement
-#> vd aa -test -swp
+#> vd 337 -337.
 ## a=vim.
-## a=./aa.
-## a=./sample.aarc.
+## a=337.
+## a=1337.
+## a=2337.
+## a=3337.
+## a=4337.
+#> vd 337 -337. -4 1
+## a=vim.
+## a=1337.
 vd
-    %args vx find . -name .git -prune -o -type f -print | mg
-vm
-    %args vx grep '^> ' ~/.viminfo | cut -c3- | mg
-# "vr" may need some testing; but we haven't used it in years, so maybe later!
+    %args vx `seq 4444 | mg %@`
 
 # ---- %shell with %@ and explicit tail placement
 #> vg i creator

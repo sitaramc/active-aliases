@@ -251,22 +251,18 @@ sub meta {
         return ();
     }
 
-    # "%args <cmd> <expr>" runs the expr as a shell command, captures the output,
-    # and uses that as the new argument list (new-line separated, not space
-    # separated; i.e., one argument per line.  Tail handling is same as %shell
-    if ($mc =~ /^%args +(\S+) (.*)/) {
-        my $cmd = $1;
-        my $sc = $2;
-        if ($sc =~ /(.*)%@(.*)/) {
-            $sc = $1 . join(" ", @tail) . $2;
-        } else {
-            $sc = join(" ", $sc, @tail);
-        }
+    # "%args <prefix> `<expr>`" runs the expr as a shell command, captures the
+    # output, and uses that as the new argument list (new-line separated, not
+    # space separated; i.e., one argument per line).  NOTE: you should not
+    # have anything *after* the expression.
+    if ($mc =~ /^%args +(.*?) +`(.*)`/) {
+        my $prefix = $1;
+        my $expr = $2;
 
-        my @args = `$sc`;
+        my @args = `$expr`;
         chomp(@args);
         trace "args: ", Dumper \@args;
-        return ($cmd, @args);
+        return (split(' ', $prefix), @args);
     }
 
     # # XXX DO NOT USE UNTIL WE ARE SURE IT IS REALLY NEEDED XXX
