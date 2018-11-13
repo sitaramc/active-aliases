@@ -344,11 +344,6 @@ sub setup {
     die "Usage: $0 command [args]\n" unless @ARGV;
     @ARGV = qw(_commands) if @ARGV == 1 and $ARGV[0] eq '-h';
 
-    # if the first character of the first word in the command is a dash, we
-    # have to remove it (see documentation); this allows you to trivially
-    # override real commands and force them to go through active-aliases
-    $ARGV[0] =~ s/^-//;
-
     # treat newlines embedded in arguments as argument separators.  This lets
     # you operate on file lists, such as the output of "`find ...`" (note the
     # double quotes).
