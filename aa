@@ -85,9 +85,11 @@ sub dequeue {
             for my $sc (@commands) {
                 my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
 
-                if ($newcmd[0] eq '!') {
-                    shift @newcmd;
-                    _system(@newcmd);
+                if ($newcmd[0] eq '!' or $newcmd[0] eq '!sh') {
+                    # immediate execution; capture results (newline-separated)
+                    $groups[0] = _capture(@newcmd);
+                    # XXX at the moment we don't have the concept of "run
+                    # immediately but do not capture"
                 } else {
                     # "processed by the rest of the rc lines" actually means
                     # we add to the queue; see comments on 'queue' at the top.
@@ -403,6 +405,34 @@ sub unget {
     unshift @$lines, $l;
 }
 
+sub _capture {
+    @_ = shemulate(@_);
+    my $type = shift;
+
+    if ($_[0] eq '+') {
+        shift @_;
+        say STDERR join(" ", $type, "+", @_);
+    }
+
+    if ($type eq '!') {
+        open(my $fh, "-|", @_) or die "open failed: $!";
+        my @ret = <$fh>;
+        chomp(@ret);
+        my $rc = close($fh);
+        warn "rc = $rc, command = ", join(" ", @_), "\n";
+        return \@ret;
+
+    } elsif ($type eq '!sh') {
+        my $cmd = join(" ", @_);
+        my @ret = `$cmd`;
+        chomp(@ret);
+        return \@ret;
+
+    } else {
+        die "this should not happen!";
+    }
+}
+
 # run a command, but first shemulate()
 sub _system {
     @_ = shemulate(@_);
@@ -415,7 +445,11 @@ sub _system {
     # exit with <rc of system()> if it applies, else just "exit 1".
 
     my $rc;
-    if ($_[0] eq 'exec') {
+    if ($_[0] eq 'sh') {
+        shift;
+        my $cmd = join(" ", @_);
+        $rc = system("sh", "-c", $cmd);
+    } elsif ($_[0] eq 'exec') {
         # XXX warn in docs about any subsequent queued items going bye-bye!
         # (Or better yet, since the @queue is file scoped, detect if there are
         # more commands and warn the user!

@@ -109,8 +109,8 @@ t9 %
 #> t10 < /dev/null
 ## not a tty
 t10
-    %shell [ $_tty = 1 ] && echo IS  a tty; :
-    %shell [ $_tty = 0 ] && echo not a tty; :
+    !sh [ $_tty = 1 ] && echo IS || echo not ; :
+    echo %0 a tty
 
 #> t11
 ## this message should show up
@@ -236,7 +236,8 @@ t16 % %
 ## a=vim.
 ## a=/usr/bin/ls.
 vw %
-    %shell args vw: $EDITOR `which %1`
+    ! which %1
+    args vw: $EDITOR %0
 
 # ---- %args, with implicit tail placement
 #> vd 337 -337.
@@ -250,7 +251,8 @@ vw %
 ## a=vim.
 ## a=1337.
 vd
-    %args vx `seq 4444 | mg %@`
+    !sh seq 4444 | mg %@
+    vx %0 %.
 
 # ---- %shell with %@ and explicit tail placement
 #> vg i creator
@@ -266,8 +268,10 @@ vg %% iw
     vg %1 -i -w
 vg %% wi
     vg %1 -i -w
-vg
-    %shell args vg: $EDITOR -c 'Grep %@'
+vg %%
+    sh args vg: $EDITOR -c 'Grep %1'
+
+# %shell args vg: $EDITOR -c 'Grep %@'
 
 vx
     args vim
@@ -281,7 +285,7 @@ vx
 ## a=-c.
 ## a=DirDiff aa bb.
 vdd % %
-    %shell args vdd: vim -c 'syntax off' -c 'DirDiff %1 %2'
+    sh args vdd: vim -c 'syntax off' -c 'DirDiff %1 %2'
 
 # ---- ew
 # for this test, we pretend rg does not exist and go straight to egrep
