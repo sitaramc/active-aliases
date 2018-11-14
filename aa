@@ -368,9 +368,8 @@ sub _eval {
     my $e = shift;      # expression
     # that leaves @groups in @_
 
-    # wrap $e in an array (and unwrap the result) because interpolate will do
-    # nasty things to perl code if you send in a string!
-    $e = (interpolate([$e], \@_))[0];
+    # perl block needs to have line breaks preserved
+    $e = join("\n", interpolate([ split "\n", $e ], \@_));
 
     trace "eval: $e";
     my $rc = eval $e;
