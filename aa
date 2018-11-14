@@ -163,7 +163,7 @@ sub match {
             }
             my $p = $patt[0];   # the next word in the pattern, after the "%%" we're at
             while ($i < @cmd) {
-                last if $cmd[$i] eq $p or $cmd[$i] =~ /$p/;
+                last if $cmd[$i] eq $p or $cmd[$i] =~ /^$p$/;
                 $i++;
             }
             if ($i < @cmd) {
