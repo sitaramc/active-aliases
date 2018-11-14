@@ -46,7 +46,9 @@ sub dequeue {
             # strings from matched "capture groups" in the pattern
             my @tail = @{ $res->[0] };
             my @groups = @{ $res->[1] };
-            trace "cmd, tail, groups = ", Dumper \@cmd, \@tail, \@groups;
+            trace "cmd    = ", Dumper \@cmd;
+            trace "tails  = ", Dumper \@tail;
+            trace "groups = ", Dumper \@groups;
 
             my @subqueue = ();
             # the purpose of the subqueue is that we push commands to it as
