@@ -79,27 +79,9 @@ sub dequeue {
             # and now the commands...
             my @commands = @{ $ccr->[1] };
 
-            # if the first command is a "meta" command, then all of them have to be
-            if ($commands[0] =~ /^%[a-z]+ /) {
-                for my $mc (@commands) {
-                    # interpolate before sending the line off to meta()
-                    $mc = interpolate($mc, \@groups, \@tail);
-
-                    @cmd = meta($mc, \@cmd, \@tail);
-                }
-
-                # some metas, like %shell, do not have a "final" command for
-                # us to continue processing, so just get out of dequeue
-                return unless @cmd;
-
-                # all other cases, we continue transforming the current @cmd
-                next;   # get out of this loop
-            }
-
-            # now they are either commands to replace the current command (and
-            # thus continue being processed by the rest of the rc lines), or
-            # -- if the first character is a "!" -- a command to be executed
-            # immediately.
+            # these are either commands to replace the current command (and
+            # get queued to later be processed by the rest of the rc lines),
+            # or something to be executed immediately (see below).
             for my $sc (@commands) {
                 my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
 
@@ -208,47 +190,8 @@ sub match {
 }
 
 # ----------------------------------------------------------------------
-# meta, interpolate, and shemulate -- all of these have to do with munging the
+# interpolate, and shemulate -- all of these have to do with munging the
 # command+arguments in some way
-
-# meta commands in the rc file are special "escape" routines to do more
-# complex things that cannot be done directly in the user's rc file.
-sub meta {
-    my $mc = shift;
-    my @cmd = @{ shift() };
-    my @tail = @{ shift() };
-
-    trace "meta: mc = $mc";
-
-    # "%shell <shell command>" runs the command supplied as a shell command.
-    # This is potentially dangerous if the files have shell-unsafe names, but
-    # sometimes you gotta do what you gotta do!  (TBD: interpolate() may need
-    # to quote each member of tail before joining, which may be hard.  Best
-    # use this only for safe filenames, and for others, use a wrapper!
-    if ($mc =~ /^%shell +(.*)/) {
-        my $sc = $1;
-
-        trace "shell ", Dumper $sc;
-        _system("sh", "-c", $sc);
-        return ();
-    }
-
-    # "%args <prefix> `<expr>`" runs the expr as a shell command, captures the
-    # output, and uses that as the new argument list (new-line separated, not
-    # space separated; i.e., one argument per line).  NOTE: you should not
-    # have anything *after* the expression.
-    if ($mc =~ /^%args +(.*?) +`(.*)`/) {
-        my $prefix = $1;
-        my $expr = $2;
-
-        my @args = `$expr`;
-        chomp(@args);
-        trace "args: ", Dumper \@args;
-        return (split(' ', $prefix), @args);
-    }
-
-    die "not a valid meta command";
-}
 
 # emulate shell, poorly :-)  Just $$, $var, ${var}, and "~/" are handled
 sub shemulate {
@@ -460,7 +403,7 @@ sub unget {
 
 # run a command, but first shemulate()
 sub _system {
-    @_ = shemulate(@_) unless @_ > 2 and $_[0] eq 'sh' and $_[1] eq '-c';
+    @_ = shemulate(@_);
     if ($_[0] eq '+') {
         shift @_;
         say STDERR join(" ", "+", @_);
