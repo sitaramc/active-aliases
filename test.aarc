@@ -121,7 +121,7 @@ t11
 t11
     echo this message should show up
 
-# ---- %each
+# ---- each
 #> t12 a b c
 ## pre a post
 ## pre b post
@@ -184,17 +184,17 @@ _t13c_2
     echo 2:
 
 # ---- watch
-#> t14 1 echo hi there | head -4
+#> Watch 1 echo hi there | head -4
 ## hi there
 ## hi there
 ## hi there
 ## hi there
-t14 (\d+) %%
+Watch (\d+) %%
     %2
     # sleep %1
-    exec aa t14 %1 %2
+    exec aa Watch %1 %2
 
-# ---- %s
+# ---- %%
 #> t15 a1 d4
 ## slow a1 -d 4
 #> t15 d4 e5
@@ -214,22 +214,72 @@ t15 %% d(\d+)	t15 %1 -d %2
 t15
     echo slow
 
-# ---- cartesian product
-#> t16 a b // c d
+# ---- cart prod
+cartprod % %% // %%
+    aa cartprod %1 // %3
+    aa cartprod %2 // %3
+cartprod % // % %%
+    echo %1 %2
+    aa cartprod %1 // %3
+cartprod % // %
+    echo %1 %2
+#> cartprod a // b
+## a b
+#> cartprod a // b c
+## a b
+## a c
+#> cartprod a b // c
+## a c
+## b c
+#> cartprod a b // c d
 ## a c
 ## a d
 ## b c
 ## b d
-# item 2 is a separator
-t16 % // % @
-    echo %1 %2 %.
-    ./aa t16 %1 //
-t16 % // %
-    echo %1 %2
-# item 2 is not a separator
-t16 % %
-    ./aa t16 %1
-    ./aa t16 %2
+#> cartprod a b // c d e
+## a c
+## a d
+## a e
+## b c
+## b d
+## b e
+#> cartprod a b c // d e f
+## a d
+## a e
+## a f
+## b d
+## b e
+## b f
+## c d
+## c e
+## c f
+#> cartprod a b c d // e
+## a e
+## b e
+## c e
+## d e
+#> cartprod a // b c d e
+## a b
+## a c
+## a d
+## a e
+
+
+# ---- each with command+arguments
+each %% -- % %%
+    sh %1 %2
+    exec aa each %1 -- %3
+each %% -- %
+    sh %1 %2
+#> each echo a b c -- 1 2 3 4
+## a b c 1
+## a b c 2
+## a b c 3
+## a b c 4
+
+# ----------------------------------------------------------------------
+# verified till here
+# ----------------------------------------------------------------------
 
 # ---- %shell with shell variables and arguments within backquotes
 #> vw ls
