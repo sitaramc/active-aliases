@@ -88,8 +88,6 @@ sub dequeue {
                 if ($newcmd[0] eq '!' or $newcmd[0] eq '!sh') {
                     # immediate execution; capture results (newline-separated)
                     $groups[0] = _capture(@newcmd);
-                    # XXX at the moment we don't have the concept of "run
-                    # immediately but do not capture"
                 } else {
                     # "processed by the rest of the rc lines" actually means
                     # we add to the queue; see comments on 'queue' at the top.
@@ -202,8 +200,6 @@ sub shemulate {
     map { s(^~/)($ENV{HOME}/) } @a;
     map { s(\$(\w+))($ENV{$1})g } @a;
     map { s(\$\{(\w+)\})($ENV{$1})g } @a;
-    # NOTE: warn in documentation that complex stuff (like, say "${var:-val}
-    # etc won't work; we're not a shell!
 
     return @a;
 }
@@ -238,6 +234,7 @@ sub interpolate {
         } else {
             $w =~ s/%(\d+)/deref($groups->[$1])/ge;
             $tail and ref($tail) and $w =~ s/%@/join(" ", @$tail)/ge and undef $tail;
+            # NOTE: possible join issues when you use $@ within a word instead of being a word by itself
             push @ret, $w;
         }
     }
@@ -450,7 +447,7 @@ sub _system {
         my $cmd = join(" ", @_);
         $rc = system("sh", "-c", $cmd);
     } elsif ($_[0] eq 'exec') {
-        # XXX warn in docs about any subsequent queued items going bye-bye!
+        # NOTE: warn in docs about any subsequent queued items going bye-bye!
         # (Or better yet, since the @queue is file scoped, detect if there are
         # more commands and warn the user!
         shift;
@@ -478,10 +475,3 @@ sub trace {
     say STDERR "[$$] ", @_;
 }
 
-__END__
-
-to be tested
-    %0 as a replacement for perl block output
-    perl block sending out a complete @cmd
-    %% in all its glory
-    use %% to implement LC, FN, etc -- MUST BE SIMPLE!!!
