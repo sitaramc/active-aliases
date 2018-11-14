@@ -227,19 +227,14 @@ sub interpolate {
     for my $w (map $_, @$cmd) {
         if ($w =~ /^%(\d+)$/) {
             $w = $groups->[$1];
-            if (ref($w)) {
-                # result of matching "%%" is a list-ref; expand it and push
-                push @ret, @$w;
-            } else {
-                push @ret, $w;
-            }
+            push @ret, deref($w);
         } elsif ($w eq '%@') {
             # explicit positioning of the tail.  Logical conflict with %., but
             # at the moment we don't detect/warn if both are used.
             push @ret, @$tail;
             undef $tail;
         } else {
-            $w =~ s/%(\d+)/$groups->[$1]/g;
+            $w =~ s/%(\d+)/deref($groups->[$1])/ge;
             $tail and ref($tail) and $w =~ s/%@/join(" ", @$tail)/ge and undef $tail;
             push @ret, $w;
         }
@@ -249,6 +244,14 @@ sub interpolate {
     push @ret, @$tail if $tail and ref($tail);
 
     return @ret;
+}
+
+sub deref {
+    my $x = shift;
+    return $x unless ref($x);
+    # we assume it's an array; we don't use hashes in this program
+    return @$x if wantarray;
+    return join " ", @$x;
 }
 
 sub setup {
