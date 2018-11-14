@@ -155,10 +155,9 @@ sub match {
             # try to match a '%%' in the @patt with as many words from @cmd as
             # you can
             my $i = 0;
-            unshift @cmd, $l;
             if (! @patt) {
                 # that %% was the last token; all of @cmd matches
-                push @groups, [ @cmd ];
+                push @groups, [ $l, @cmd ];
                 @cmd = ();
                 last;
             }
@@ -171,7 +170,7 @@ sub match {
                 # since a single %% can match more than one word in @cmd, we
                 # push them into @groups as a ref of an array rather than a
                 # single scalar value.
-                push @groups, [ @cmd[ 0..$i-1 ] ];
+                push @groups, [ $l, @cmd[ 0..$i-1 ] ];
                 splice(@cmd, 0, $i);
             } else {
                 return ()
