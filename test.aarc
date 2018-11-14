@@ -1,3 +1,4 @@
+# vim: ts=20:
 # ---- simple stuff
 #> t1 foo bar
 ## this is foo in t1 bar
@@ -206,10 +207,10 @@ t14 (\d+) %%
 ## slow -d 4 -u 5
 #> t15 u5 d4
 ## slow -u 5 -d 4
-t15 %% u(\d+)
-    t15 %1 -u %2
-t15 %% d(\d+)
-    t15 %1 -d %2
+t15 u(\d+)	t15 -u %1
+t15 d(\d+)	t15 -d %1
+t15 %% u(\d+)	t15 %1 -u %2
+t15 %% d(\d+)	t15 %1 -d %2
 t15
     echo slow
 
@@ -260,16 +261,16 @@ vd
 ## a=vim.
 ## a=-c.
 ## a=Grep -i creator.
-vg %% i
-    vg %1 -i
-vg %% w
-    vg %1 -w
-vg %% iw
-    vg %1 -i -w
-vg %% wi
-    vg %1 -i -w
-vg %%
-    sh args vg: $EDITOR -c 'Grep %1'
+vg i	vg -i
+vg w	vg -w
+vg %% i	vg %1 -i
+vg %% w	vg %1 -w
+vg iw	vg -i -w
+vg %% iw	vg %1 -i -w
+vg wi	vg -i -w
+vg %% wi	vg %1 -i -w
+
+vg %%	sh args vg: $EDITOR -c 'Grep %1'
 
 # %shell args vg: $EDITOR -c 'Grep %@'
 
