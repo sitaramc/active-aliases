@@ -142,13 +142,11 @@ sub match {
             last;   # @patt should be empty and @cmd, what's left of it, will be @tail
         }
 
-        my $rp = qr(^$r$);
-
         if ($l eq $r) {
             # do nothing
-        } elsif ($l =~ /$rp/) {
+        } elsif ($l =~ /^$r$/) {
             # redo match in list context
-            my @g = ($l =~ /$rp/);
+            my @g = ($l =~ /^$r$/);
             # @g = () if (@g == 1 and $g[0] eq "1"); # no parens; perl returns qw(1)
             # push the matched capture groups into @groups
             push @groups, @g if @g;
