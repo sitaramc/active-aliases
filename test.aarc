@@ -376,3 +376,16 @@ ew
 ew
     args grep -E etc...
 
+# ---- sh-perl
+shperl	sh perl -E 'say 1; say 2'
+#> shperl
+## 1
+## 2
+
+# ---- nosh-perl with multiple arguments
+noshperl %%
+    perl -E %1
+#> noshperl 'say 1; say 2'
+## 1
+## 2
+
