@@ -277,7 +277,7 @@ each %% -- %
 ## a b c 3
 ## a b c 4
 
-# ---- %shell with shell variables and arguments within backquotes
+# ---- safe backquotes
 #> vw ls
 ## a=vw:.
 ## a=vim.
@@ -286,7 +286,7 @@ vw %
     ! which %1
     args vw: $EDITOR %0
 
-# ---- %args, with implicit tail placement
+# ---- backquotes
 #> vd 337 -337.
 ## a=vim.
 ## a=337.
@@ -301,11 +301,7 @@ vd %%
     !sh seq 4444 | mg %1
     vx %0
 
-# ----------------------------------------------------------------------
-# verified till here
-# ----------------------------------------------------------------------
-
-# ---- %shell with %@ and explicit tail placement
+# ---- sh with arguments
 #> vg i creator
 ## a=vg:.
 ## a=vim.
@@ -327,7 +323,7 @@ vg %%	sh args vg: $EDITOR -c 'Grep %1'
 vx
     args vim
 
-# ---- vdd
+# ---- sh with multiple quoted arguments
 #> vdd aa bb
 ## a=vdd:.
 ## a=vim.
