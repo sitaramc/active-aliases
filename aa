@@ -197,8 +197,8 @@ sub shemulate {
     my @a = @_;
     map { s(\$\$)($$)g } @a;
     map { s(^~/)($ENV{HOME}/) } @a;
-    map { s(\$(\w+))($ENV{$1})g } @a;
-    map { s(\$\{(\w+)\})($ENV{$1})g } @a;
+    map { s(\$(\w+))($ENV{$1} || '$' . $1)ge } @a;
+    map { s(\$\{(\w+)\})($ENV{$1} || '${' . $1 . '}')ge } @a;
 
     return @a;
 }

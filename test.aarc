@@ -98,10 +98,12 @@ _t8_do1 %
 # ---- shell
 #> t9 .bashrc
 ## /home/sitaram
+## $HOMEE
 ## /home/sitaram/.bashrc
 t9 %
     ?   $ENV{FOO} = "%1"; 1
     echo $HOME
+    echo $HOMEE
     ls ~/$FOO
 
 # ---- preamble + little shell + env var snippets; note the trailing "; :"
