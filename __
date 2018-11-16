@@ -192,13 +192,18 @@ sub match {
 # interpolate, and shemulate -- all of these have to do with munging the
 # command+arguments in some way
 
-# emulate shell, poorly :-)  Just $$, $var, ${var}, and "~/" are handled
+# emulate shell, poorly :-)  Only $$, ~/, $var, and ${var} for now.  And for
+# the last two, only if the var in question actually exists.
+# 
 sub shemulate {
     my @a = @_;
     map { s(\$\$)($$)g } @a;
     map { s(^~/)($ENV{HOME}/) } @a;
     map { s(\$(\w+))($ENV{$1} || '$' . $1)ge } @a;
     map { s(\$\{(\w+)\})($ENV{$1} || '${' . $1 . '}')ge } @a;
+
+    # portability: replace "%aa" by $ENV{AA_BIN}
+    map { s(%aa)($ENV{AA_BIN}) } @a;
 
     return @a;
 }
@@ -300,6 +305,9 @@ sub setup {
     # setup some env vars and such, for convenience
 
     $ENV{_tty} = ( -t ? 1 : 0 );
+
+    use FindBin;
+    $ENV{AA_BIN} = $FindBin::Bin . "/" . $FindBin::Script;
 
 }
 

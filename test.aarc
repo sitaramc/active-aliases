@@ -88,12 +88,12 @@ t6
 ## this is two in t1
 t8 % %%
     _t8_do1 %1
-    exec aa t8 %2
+    exec %aa t8 %2
 t8 %
     _t8_do1 %1
 
 _t8_do1 %
-    aa t1 %1
+    %aa t1 %1
 
 # ---- shell
 #> t9 .bashrc
@@ -130,7 +130,7 @@ t11
 ## pre c post
 t12 % %%
     _t12 %1
-    exec aa t12 %2
+    exec %aa t12 %2
 t12 %
     _t12 %1
 _t12 %
@@ -160,7 +160,7 @@ t13b
 _t13b_1 % %%
     _t13b_1e %1
     # this one is dangerous if the number of arguments are too many
-    aa _t13b_1 %2
+    %aa _t13b_1 %2
 _t13b_1 %
     _t13b_1e %1
 _t13b_1e
@@ -177,7 +177,7 @@ t13c
     _t13c_2 d
 _t13c_1 % %%
     _t13c_1e %1
-    exec aa _t13c_1 %2
+    exec %aa _t13c_1 %2
 _t13c_1 %
     _t13c_1e %1
 _t13c_1e
@@ -194,7 +194,7 @@ _t13c_2
 Watch (\d+) %%
     %2
     # sleep %1
-    exec aa Watch %1 %2
+    exec %aa Watch %1 %2
 
 # ---- %%
 #> t15 a1 d4
@@ -218,11 +218,11 @@ t15
 
 # ---- cart prod
 cartprod % %% // %%
-    aa cartprod %1 // %3
-    aa cartprod %2 // %3
+    %aa cartprod %1 // %3
+    %aa cartprod %2 // %3
 cartprod % // % %%
     echo %1 %2
-    aa cartprod %1 // %3
+    %aa cartprod %1 // %3
 cartprod % // %
     echo %1 %2
 #> cartprod a // b
@@ -270,7 +270,7 @@ cartprod % // %
 # ---- each with command+arguments
 each %% -- % %%
     sh %1 %2
-    exec aa each %1 -- %3
+    exec %aa each %1 -- %3
 each %% -- %
     sh %1 %2
 #> each echo a b c -- 1 2 3 4

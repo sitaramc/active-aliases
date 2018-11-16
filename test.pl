@@ -11,11 +11,18 @@ use strict;
 use warnings;
 use Data::Dumper;
 
+$ENV{AA_BIN} = "$ENV{PWD}/__";
+
+if (@ARGV and $ARGV[0] eq "-f") {
+    # this allows you to say "./test.pl -f someother.rc command args"
+    shift;
+    $ENV{AA_RC} = shift;
+}
 $ENV{AA_RC} ||= "test.aarc";
 # if argv exists, just run that; we're not really testing, rather just using
 # this script to set up AA_RC for convenience
 if (@ARGV) {
-    exec("./aa", @ARGV);
+    exec($ENV{AA_BIN}, @ARGV);
 }
 
 open(STDERR, ">", "/dev/null");
@@ -59,7 +66,7 @@ sub run_test {
     my $fwt = $t; $fwt =~ s/ .*//; chomp($fwt); # first word of test command
     $count++;
     $er = '' if $er eq "\n";
-    my $rc = `./aa $t`;
+    my $rc = `$ENV{AA_BIN} $t`;
     print ( $count % 5 == 0 ? "($fwt)" : "." );
     if ($rc ne $er) {
         say "";
