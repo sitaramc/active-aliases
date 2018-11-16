@@ -423,7 +423,7 @@ sub _capture {
         my @ret = <$fh>;
         chomp(@ret);
         my $rc = close($fh);
-        warn "rc = $rc, command = ", join(" ", @_), "\n";
+        warn "rc = $?, command = ", join(" ", @_), "\n" unless $rc;
         return \@ret;
 
     } elsif ($type eq '!sh') {
