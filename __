@@ -122,70 +122,22 @@ sub match {
     my @groups = qw(dummy);
     # start with a dummy so indexing of the actual matched groups can be 1-based
 
-    # first, a "%" all by itself in @patt is syntactic sugar for a single word
-    map { $_ = '(.*)' if $_ eq '%' } @patt;
+    # matching: the left side is the current command, right side is the pattern
+    my $cmd = join("\n", @cmd);
+    $patt = join("\n", map { s/^%%$/([^\\x00]+)/; s/^%$/(.+)/; $_ } @patt);
 
-    # matching: the left side is the current command, right side is the
-    # pattern.  Go through them item by item (or "word by word", if you will)
-
-    while (@cmd and @patt) {
-        my $l = shift @cmd;
-        my $r = shift @patt;
-
-        # the purpose of "@" (which can only occur as the last word in a
-        # command) is to signify that a tail is **expected**.  It's kinda like
-        # a positive lookahead in regex, since it does not consume the
-        # corresponding word from the command (because we unshift it back)
-        if ($r eq '@') {
-            die "'@' must be the last item in pattern\n" if @patt;
-            unshift @cmd, $l;
-            last;   # @patt should be empty and @cmd, what's left of it, will be @tail
-        }
-
-        if ($l eq $r) {
-            # do nothing
-        } elsif ($l =~ /^$r$/) {
-            # redo match in list context
-            my @g = ($l =~ /^$r$/);
-            # @g = () if (@g == 1 and $g[0] eq "1"); # no parens; perl returns qw(1)
-            # push the matched capture groups into @groups
-            push @groups, @g if @g;
-
-        } elsif ($r eq '%%') {
-            # try to match a '%%' in the @patt with as many words from @cmd as
-            # you can
-            my $i = 0;
-            if (! @patt) {
-                # that %% was the last token; all of @cmd matches
-                push @groups, [ $l, @cmd ];
-                @cmd = ();
-                last;
-            }
-            my $p = $patt[0];   # the next word in the pattern, after the "%%" we're at
-            while ($i < @cmd) {
-                last if $cmd[$i] eq $p or $cmd[$i] =~ /^$p$/;
-                $i++;
-            }
-            if ($i < @cmd) {
-                # since a single %% can match more than one word in @cmd, we
-                # push them into @groups as a ref of an array rather than a
-                # single scalar value.
-                push @groups, [ $l, @cmd[ 0..$i-1 ] ];
-                splice(@cmd, 0, $i);
-            } else {
-                return ()
-            }
-
-        } else {
-            return ();
-        }
+    # say Dumper "cmd = $cmd";
+    # say Dumper "patt = $patt";
+    if ($cmd =~ /\A$patt(?:\n|$)/) {
+        my @c = @{^CAPTURE};
+        push @groups, map { /\n/ ? [ split("\n", $_) ] : $_ } @c;
+        # now we need to find the tail
+        my @matched = split("\n", $&);
+        splice @cmd, 0, @matched;
+        return [ \@cmd, \@groups ];
     }
 
-    # more of the pattern exists, but our current @cmd ran out, so clearly
-    # this is not a match
-    return () if @patt;
-
-    return [ \@cmd, \@groups ];
+    return ();  # fail
 }
 
 # ----------------------------------------------------------------------
