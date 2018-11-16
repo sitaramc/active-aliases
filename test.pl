@@ -11,29 +11,38 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-$ENV{AA_BIN} = "$ENV{PWD}/__";
+# ----------------------------------------------------------------------
+# setup
 
+# setup test rc file
 if (@ARGV and $ARGV[0] eq "-f") {
     # this allows you to say "./test.pl -f someother.rc command args"
     shift;
     $ENV{AA_RC} = shift;
 }
 $ENV{AA_RC} ||= "test.aarc";
-# if argv exists, just run that; we're not really testing, rather just using
-# this script to set up AA_RC for convenience
+
+# setup other env vars
+$ENV{AA_BIN} = "$ENV{PWD}/__";
+$ENV{EDITOR} = "vim";   # don't worry, no editor is actually invoked
+$ENV{PATH} = "$ENV{PWD}/test-helpers:" . $ENV{PATH};
+
+# run single test (usually manually) if argv exists
 if (@ARGV) {
     exec($ENV{AA_BIN}, @ARGV);
 }
 
-open(STDERR, ">", "/dev/null");
+# count number of tests in test rc file and declare TAP plan
+my $plan = `grep -c '^#> ' < $ENV{AA_RC}`;
+chomp($plan);
+say "1..$plan";
 
+# prepare to read the test rc
 @ARGV = ($ENV{AA_RC});
 
-# the test script assumes this; don't worry, no editor is invoked within the test!
-$ENV{EDITOR} = "vim";
-# the test script uses some scripts that are not standard, but I use heavily;
-# make them available to the test script
-$ENV{PATH} = "$ENV{PWD}/test-helpers:" . $ENV{PATH}.
+open(STDERR, ">", "/dev/null");
+
+# ----------------------------------------------------------------------
 
 my ($t, $er);   # test, expected result
 while (<>) {
@@ -56,6 +65,8 @@ if ($t) {
     run_test($t, $er);
 }
 
+# ----------------------------------------------------------------------
+
 my $count;
 sub run_test {
     my ($t, $er) = @_;
@@ -67,10 +78,14 @@ sub run_test {
     $count++;
     $er = '' if $er eq "\n";
     my $rc = `$ENV{AA_BIN} $t`;
-    print ( $count % 5 == 0 ? "($fwt)" : "." );
+    if ($ENV{HARNESS_ACTIVE}) {
+        say ( $rc eq $er ? "ok $count" : "not ok $count" );
+        return;
+    }
+    # print ( $count % 5 == 0 ? "($fwt)" : "." );
     if ($rc ne $er) {
         say "";
         chomp($t); chomp($rc); chomp($er);
-        print "fail:\n\ttest   = $t\n\texpect = $er\n\tgot    = $rc\n";
+        print "test $count fail:\n\ttest   = $t\n\texpect = $er\n\tgot    = $rc\n";
     }
 }
