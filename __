@@ -38,6 +38,7 @@ sub dequeue {
         # match the current "pattern" line to the current command
         my $res = match($line, @cmd);
         if ($res) {
+            trace "";
             trace "pass: $line matches ", Dumper \@cmd;
 
             # if the match succeeded, you get back a "tail", which is the list
