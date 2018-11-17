@@ -124,11 +124,18 @@ sub match {
 
     # matching: the left side is the current command, right side is the pattern
     my $cmd = join("\n", @cmd);
+    my $end;
+    if ($patt[-1] eq '$') {
+        pop @patt;
+        $end = '\Z';
+    } else {
+        $end = '(?:\n|$)';
+    }
     $patt = join("\n", map { s/^%%$/([^\\x00]+)/; s/^%$/(.+)/; $_ } @patt);
 
-    # say Dumper "cmd = $cmd";
-    # say Dumper "patt = $patt";
-    if ($cmd =~ /\A$patt(?:\n|$)/) {
+    # say STDERR Dumper "cmd = $cmd";
+    # say STDERR Dumper "patt = $patt";
+    if ($cmd =~ /\A$patt$end/) {
         my @c = @{^CAPTURE};
         push @groups, map { /\n/ ? [ split("\n", $_) ] : $_ } @c;
         # now we need to find the tail
