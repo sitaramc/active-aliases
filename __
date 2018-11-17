@@ -409,7 +409,10 @@ sub _system {
     # exit with <rc of system()> if it applies, else just "exit 1".
 
     my $rc;
-    if ($_[0] eq 'sh') {
+    if ($_[0] eq 'die') {
+        shift;
+        die join(" ", @_) . "\n";
+    } elsif ($_[0] eq 'sh') {
         shift;
         my $cmd = join(" ", @_);
         $rc = system("sh", "-c", $cmd);
