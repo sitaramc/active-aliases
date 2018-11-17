@@ -387,3 +387,58 @@ noshperl %%
 ## 1
 ## 2
 
+# ---- sf (find)
+# (see sample.aarc)
+sf $
+    ?   say "sf [path] [pattern] [options]
+            options can be -r (use iregex instead of iname), -f/d/l (-type f/d/l
+            respectively, -d (maxdepth), -m/c (mmin/cmin), -s (size).  The last 4
+            options must be followed by an appropriate argument."
+    die
+sf %
+    ?   ! -d "%1"
+    sf . %1
+sf % -(.*)	_sf %1 -%2
+sf % %	_sf %1 -n %2
+_sf	sf
+sf %% -n %% -r	sf %1 -r %2
+sf %% -(f|d|l)	sf %1 -type %2
+sf %% -n %	sf %1 -iname *%2*
+sf %% -r %	sf %1 -iregex .*%2.*
+sf %% -d (\d+)	sf %1 -maxdepth %2
+sf %% -m (.\d+)	sf %1 -mmin %2
+sf %% -c (.\d+)	sf %1 -cmin %2
+sf %% -s (.\d+)	sf %1 -size %2k
+sf %% -s (.\d+)[kK]	sf %1 -size %2k
+sf %% -s (.\d+)[mM]	sf %1 -size %2M
+sf %% -s (.\d+)[gG]	sf %1 -size %2G
+sf	echo find
+#> sf
+## sf [path] [pattern] [options]
+##     options can be -r (use iregex instead of iname), -f/d/l (-type f/d/l
+##     respectively, -d (maxdepth), -m/c (mmin/cmin), -s (size).  The last 4
+##     options must be followed by an appropriate argument.
+#> sf -s 10
+## find . -size 10k
+#> sf foo
+## find . -iname *foo*
+#> sf foo -r
+## find . -iregex .*foo.*
+#> sf foo -s 10
+## find . -iname *foo* -size 10k
+#> sf foo -s +10m
+## find . -iname *foo* -size +10M
+#> sf helpers
+## find helpers
+#> sf helpers bar
+## find helpers -iname *bar*
+#> sf helpers bar -r
+## find helpers -iregex .*bar.*
+#> sf helpers -s 10
+## find helpers -size 10k
+#> sf helpers bar -s 10
+## find helpers -iname *bar* -size 10k
+#> sf helpers -s +10m
+## find helpers -size +10M
+#> sf helpers bar -s -1g
+## find helpers -iname *bar* -size -1G
