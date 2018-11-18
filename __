@@ -15,12 +15,18 @@ my @queue;
 # active aliases and the previous one.  It basically allows one command to
 # spawn multiple commands as it is processed.  Yes it's useful.  I think :)
 
+my $exit_code = 0;
+# this is global; we maintain exactly one exitcode, for the last executed
+# *external* command (however it was called)
+
 setup();
 # deal with @ARGV, decide what rc files to use, and set up the queue
 
 while (@queue) {
     dequeue();
 }
+
+exit $exit_code;
 
 # ----------------------------------------------------------------------
 
@@ -30,6 +36,9 @@ sub dequeue {
     trace "dequeue: ", scalar(@lines), " lines, ", Dumper \@cmd;
     # my @cmd = @{ +shift };
     # my @lines = @{ +shift };
+
+    # one special interpolation is done here: %?
+    map { $_ = $exit_code if $_ eq '%?' } @cmd;
 
     while (my $line = nextline('patt', \@lines)) {
         last if /__END__/;
@@ -383,12 +392,15 @@ sub _capture {
         my @ret = <$fh>;
         chomp(@ret);
         my $rc = close($fh);
-        warn "rc = $?, command = ", join(" ", @_), "\n" unless $rc;
+        $exit_code = interpret($?, $!);
+        warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code\n" if $exit_code;
         return \@ret;
 
     } elsif ($type eq '!sh') {
         my $cmd = join(" ", @_);
         my @ret = `$cmd`;
+        $exit_code = interpret($?, $!);
+        warn "WARNING: '$cmd' exited with $exit_code\n" if $exit_code;
         chomp(@ret);
         return \@ret;
 
@@ -416,28 +428,41 @@ sub _system {
         shift;
         my $cmd = join(" ", @_);
         $rc = system("sh", "-c", $cmd);
+        $exit_code = interpret($?, $!);
     } elsif ($_[0] eq 'exec') {
         # NOTE: warn in docs about any subsequent queued items going bye-bye!
         # (Or better yet, since the @queue is file scoped, detect if there are
         # more commands and warn the user!
         shift;
-        $rc = exec(@_);
+        { $rc = exec(@_); }
+        $exit_code = interpret($?, $!) ;
     } else {
         $rc = system(@_);
+        $exit_code = interpret($?, $!);
     }
 
     if ( $rc != 0 ) {
-        say STDERR "system() failed: ", join(" ", @_), " -> $?";
-        if ( $? == -1 ) {
-            die "failed to execute: $!\n" if $ENV{D};
-        } elsif ( $? & 127 ) {
-            die "child died with signal " . ( $? & 127 ) . "\n" if $ENV{D};
-        } else {
-            die "child exited with value " . ( $? >> 8 ) . "\n" if $ENV{D};
-            exit( $? >> 8 );
-        }
-        exit 1;
+        warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code\n";
+        # exit 1;
     }
+}
+
+sub interpret {
+    my $q = shift;
+    my $b = shift;
+    # XXX for now, the first two conditions below will kill the whole thing;
+    # but it is very likely we will have to revisit this later
+    if ( $q == -1 ) {
+        warn "failed to execute: $b\n";
+        return -1;
+    } elsif ( $q & 127 ) {
+        warn "child died with signal " . ( $q & 127 ) . "\n";
+        return -($q & 127);
+    } else {
+        # warn "child exited with value " . ( $q >> 8 ) . "\n";
+        return ($q >> 8);
+    }
+    return 0;
 }
 
 sub trace {

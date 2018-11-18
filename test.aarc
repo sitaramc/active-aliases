@@ -194,7 +194,11 @@ _t13c_2
 Watch (\d+) %%
     %2
     # sleep %1
-    exec %aa Watch %1 %2
+    _watch %? %1 %2
+_watch 0
+    exec %aa Watch
+_watch %
+    true
 
 # ---- %%
 #> t15 a1 d4
