@@ -8,7 +8,9 @@ $Data::Dumper::Indent = 0;
 $Data::Dumper::Terse = 1;
 $Data::Dumper::Useqq = 1;
 
+sub _warn;
 sub trace;
+
 my %share;
 my @queue;
 # the queue is one of the fundamental differences between this version of
@@ -33,7 +35,8 @@ exit $exit_code;
 sub dequeue {
     my @cmd   = @{ shift(@queue) };
     my @lines = @{ shift(@queue) };
-    trace "dequeue: ", scalar(@lines), " lines, ", Dumper \@cmd;
+    trace "";
+    trace "dequeue ", Dumper \@cmd;
     # my @cmd = @{ +shift };
     # my @lines = @{ +shift };
 
@@ -47,8 +50,7 @@ sub dequeue {
         # match the current "pattern" line to the current command
         my $res = match($line, @cmd);
         if ($res) {
-            trace "";
-            trace "pass: $line matches ", Dumper \@cmd;
+            trace "pass:   $line";
 
             # if the match succeeded, you get back a "tail", which is the list
             # of arguments left over after the command matched the pattern
@@ -56,9 +58,9 @@ sub dequeue {
             # strings from matched "capture groups" in the pattern
             my @tail = @{ $res->[0] };
             my @groups = @{ $res->[1] };
-            trace "cmd    = ", Dumper \@cmd;
-            trace "tails  = ", Dumper \@tail;
-            trace "groups = ", Dumper \@groups;
+            trace "cmd:    ", Dumper \@cmd;
+            trace "tails:  ", Dumper \@tail;
+            trace "groups: ", Dumper \@groups;
 
             my @subqueue = ();
             # the purpose of the subqueue is that we push commands to it as
@@ -73,7 +75,7 @@ sub dequeue {
             # commands to run and/or replace the current one, but only if the
             # first block returned true on eval (or was empty).
             my $ccr = nextline('blocks', \@lines);    # cond + commands/replacement
-            trace "ccr: ", Dumper $ccr;
+            trace "ccr:    ", Dumper $ccr;
 
             %share = ( 'cmd' => \@cmd, 'tail' => \@tail, 'groups' => \@groups );
             sub grab {
@@ -115,7 +117,7 @@ sub dequeue {
     # what's left in @cmd at this point is what we need to run; this is *some*
     # queued command that made it all the way through the remaining lines,
     # without getting transformed.
-    trace "final: ", Dumper \@cmd;
+    trace "final:  ", Dumper \@cmd;
     _system(@cmd);
 }
 
@@ -127,6 +129,7 @@ sub dequeue {
 sub match {
     my $patt = shift;
     my @cmd = @_;
+    trace "m.patt: $patt";
 
     my @patt = split ' ', $patt;
     my @groups = qw(dummy);
@@ -143,8 +146,6 @@ sub match {
     }
     $patt = join("\n", map { s/^%%$/([^\\x00]+)/; s/^%$/(.+)/; $_ } @patt);
 
-    # say STDERR Dumper "cmd = $cmd";
-    # say STDERR Dumper "patt = $patt";
     if ($cmd =~ /\A$patt$end/) {
         my @c = @{^CAPTURE};
         push @groups, map { /\n/ ? [ split("\n", $_) ] : $_ } @c;
@@ -348,7 +349,7 @@ sub _eval {
 
     trace "eval: $e";
     my $rc = eval $e;
-    say STDERR "eval failed; $@" unless defined($rc);
+    trace "eval failed: $@" unless defined($rc);
     return $rc;
 }
 
@@ -393,14 +394,14 @@ sub _capture {
         chomp(@ret);
         my $rc = close($fh);
         $exit_code = interpret($?, $!);
-        warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code\n" if $exit_code;
+        _warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code" if $exit_code;
         return \@ret;
 
     } elsif ($type eq '!sh') {
         my $cmd = join(" ", @_);
         my @ret = `$cmd`;
         $exit_code = interpret($?, $!);
-        warn "WARNING: '$cmd' exited with $exit_code\n" if $exit_code;
+        _warn "WARNING: '$cmd' exited with $exit_code" if $exit_code;
         chomp(@ret);
         return \@ret;
 
@@ -415,7 +416,7 @@ sub _system {
 
     if ($_[0] eq '&&' and $exit_code != 0 or
         $_[0] eq '||' and $exit_code == 0 ) {
-        warn "exit_code = $exit_code, skipping: ", join(" ", @_) . "\n";
+        _warn "exit_code = $exit_code, skipping: ", join(" ", @_);
         return;
     }
     shift if $_[0] eq '&&' or $_[0] eq '||';
@@ -450,7 +451,7 @@ sub _system {
     }
 
     if ( $rc != 0 ) {
-        warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code\n";
+        _warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code";
         # exit 1;
     }
 }
@@ -467,8 +468,9 @@ sub interpret {
         warn "child died with signal " . ( $q & 127 ) . "\n";
         return -($q & 127);
     } else {
-        # warn "child exited with value " . ( $q >> 8 ) . "\n";
-        return ($q >> 8);
+        my $ec = $q >> 8;
+        _warn "child exited with value $ec" if $ec;
+        return $ec;
     }
     return 0;
 }
@@ -478,3 +480,7 @@ sub trace {
     say STDERR "[$$] ", @_;
 }
 
+sub _warn {
+    return unless defined $ENV{D};
+    say STDERR @_;
+}
