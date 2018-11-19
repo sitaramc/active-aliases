@@ -25,7 +25,7 @@ $ENV{AA_RC} ||= "test.aarc";
 # setup other env vars
 $ENV{AA_BIN} = "$ENV{PWD}/__";
 $ENV{EDITOR} = "vim";   # don't worry, no editor is actually invoked
-$ENV{PATH} = "$ENV{PWD}/test-helpers:" . $ENV{PATH};
+$ENV{PATH} = "$ENV{PWD}/helpers:" . $ENV{PATH};
 
 # run single test (usually manually) if argv exists
 if (@ARGV) {
