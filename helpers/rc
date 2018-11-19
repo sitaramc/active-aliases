@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo a${1:-37}b
+exit ${1:-37}

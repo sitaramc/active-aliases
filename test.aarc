@@ -200,6 +200,17 @@ _watch 0
 _watch %
     true
 
+# ---- watch2
+#> Watch2 1 echo hi there | head -4
+## hi there
+## hi there
+## hi there
+## hi there
+Watch2 (\d+) %%
+    %2
+    # sleep %1
+    && exec %aa Watch2 %1 %2
+
 # ---- %%
 #> t15 a1 d4
 ## slow a1 -d 4
@@ -446,3 +457,45 @@ sf	echo find
 ## find helpers -size +10M
 #> sf helpers bar -s -1g
 ## find helpers -iname *bar* -size -1G
+
+# ---- more && and || tests
+t16a % % %
+    rc %1
+    && rc %2
+    && rc %3
+t16b % % %
+    rc %1
+    || rc %2
+    || rc %3
+t16c % % %
+    rc %1
+    && rc %2
+    || rc %3
+t16d % % %
+    rc %1
+    || rc %2
+    && rc %3
+#> t16a 0 0 0
+## a0b
+## a0b
+## a0b
+#> t16b 0 0 1
+## a0b
+#> t16c 0 2 0
+## a0b
+## a2b
+## a0b
+#> t16d 0 1 2
+## a0b
+## a2b
+#> t16a 1 0 0
+## a1b
+#> t16b 2 0 1
+## a2b
+## a0b
+#> t16c 2 1 0
+## a2b
+## a0b
+#> t16d 2 1 2
+## a2b
+## a1b

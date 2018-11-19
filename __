@@ -412,6 +412,14 @@ sub _capture {
 # run a command, but first shemulate()
 sub _system {
     @_ = shemulate(@_);
+
+    if ($_[0] eq '&&' and $exit_code != 0 or
+        $_[0] eq '||' and $exit_code == 0 ) {
+        warn "exit_code = $exit_code, skipping: ", join(" ", @_) . "\n";
+        return;
+    }
+    shift if $_[0] eq '&&' or $_[0] eq '||';
+
     if ($_[0] eq '+') {
         shift @_;
         say STDERR join(" ", "+", @_);
