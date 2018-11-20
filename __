@@ -41,6 +41,14 @@ sub dequeue {
     # my @cmd = @{ +shift };
     # my @lines = @{ +shift };
 
+    # deal with && and ||
+    if ($cmd[0] eq '&&' and $exit_code != 0 or
+        $cmd[0] eq '||' and $exit_code == 0 ) {
+        _warn "exit_code = $exit_code, skipping: ", join(" ", @cmd);
+        return;
+    }
+    shift @cmd if $cmd[0] eq '&&' or $cmd[0] eq '||';
+
     # one special interpolation is done here: %?
     map { $_ = $exit_code if $_ eq '%?' } @cmd;
 
