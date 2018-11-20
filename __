@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use 5.10.0;
 use Data::Dumper;
+use List::Util qw(first);
 
 $Data::Dumper::Indent = 0;
 $Data::Dumper::Terse = 1;
@@ -266,6 +267,13 @@ sub setup {
     }
 
     my @lines = <>;     # which, as you know, eats up @ARGV;
+    if ($ENV{AA_RC}) {
+        # it could be a shell script with an active alias script embedded
+        # within; search for the marker ("#!__" on a line by itself) and if it
+        # exists, delete everything upto the marker.
+        my $marker = first { $lines[$_] eq "#!__\n" } 0 .. $#lines;
+        splice @lines, 0, $marker+1 if defined($marker);
+    }
     push @queue, \@lines;
 
     # check if shell completion command requested
