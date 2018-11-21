@@ -449,11 +449,22 @@ sub _system {
     if ($_[0] eq 'die') {
         shift;
         die join(" ", @_) . "\n";
+
+    } elsif ($_[0] eq 'pl') {
+        shift;
+        my $e = join(" ", @_);
+
+        trace "eval: $e";
+        $rc = eval $e;
+        trace "eval failed: $@" unless defined($rc);
+        $exit_code = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+
     } elsif ($_[0] eq 'sh') {
         shift;
         my $cmd = join(" ", @_);
         $rc = system("sh", "-c", $cmd);
         $exit_code = interpret($?, $!);
+
     } elsif ($_[0] eq 'exec') {
         # NOTE: warn in docs about any subsequent queued items going bye-bye!
         # (Or better yet, since the @queue is file scoped, detect if there are
@@ -461,6 +472,7 @@ sub _system {
         shift;
         { $rc = exec(@_); }
         $exit_code = interpret($?, $!) ;
+
     } else {
         $rc = system(@_);
         $exit_code = interpret($?, $!);
