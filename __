@@ -108,7 +108,9 @@ sub dequeue {
             for my $sc (@commands) {
                 my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
 
-                if ($newcmd[0] eq '!' or $newcmd[0] eq '!sh') {
+                if ($newcmd[0] eq '!'
+                 or $newcmd[0] eq '!sh'
+                 or $newcmd[0] eq '!pl') {
                     # immediate execution; capture results (newline-separated)
                     $groups[0] = _capture(@newcmd);
                 } else {
@@ -409,17 +411,23 @@ sub _capture {
         my @ret = <$fh>;
         chomp(@ret);
         my $rc = close($fh);
-        $exit_code = interpret($?, $!);
-        _warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code" if $exit_code;
+        interpret($?, $!);
         return \@ret;
 
     } elsif ($type eq '!sh') {
         my $cmd = join(" ", @_);
         my @ret = `$cmd`;
-        $exit_code = interpret($?, $!);
-        _warn "WARNING: '$cmd' exited with $exit_code" if $exit_code;
+        interpret($?, $!);
         chomp(@ret);
         return \@ret;
+
+    } elsif ($type eq '!pl') {
+        my $e = join(" ", @_);
+
+        trace "eval: $e";
+        my $rc = eval $e;
+        trace "eval failed: $@" unless defined($rc);
+        return $rc;
 
     } else {
         die "this should not happen!";
