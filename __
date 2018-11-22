@@ -407,26 +407,33 @@ sub _capture {
     }
 
     if ($type eq '!') {
+        trace "-|open: ", Dumper \@_;
         open(my $fh, "-|", @_) or die "open failed: $!";
         my @ret = <$fh>;
         chomp(@ret);
+        trace "-|read: " . scalar(@ret) . " items";
+        trace "-|read: ", Dumper \@ret if (@ret == 1);
         my $rc = close($fh);
         interpret($?, $!);
         return \@ret;
 
     } elsif ($type eq '!sh') {
         my $cmd = join(" ", @_);
+        trace "`:      $cmd";
         my @ret = `$cmd`;
         interpret($?, $!);
         chomp(@ret);
+        trace "` read: " . scalar(@ret) . " items";
+        trace "` read: ", Dumper \@ret if (@ret == 1);
         return \@ret;
 
     } elsif ($type eq '!pl') {
         my $e = join(" ", @_);
 
-        trace "eval: $e";
+        trace "!pl:    $e";
         my $rc = eval $e;
-        trace "eval failed: $@" unless defined($rc);
+        trace "!pl:    $e";
+        trace "!fail:  $@" unless defined($rc);
         return $rc;
 
     } else {
