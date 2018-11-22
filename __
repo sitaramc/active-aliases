@@ -436,6 +436,7 @@ sub _capture {
         my $rc = eval $e;
         trace "!pl:    $e";
         trace "!fail:  $@" unless defined($rc);
+        $exit_code = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
         return $rc;
 
     } else {
