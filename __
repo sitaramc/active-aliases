@@ -460,6 +460,13 @@ sub _system {
         shift;
         die join(" ", @_) . "\n";
 
+    } elsif ($_[0] eq 'cd') {
+        # XXX document that cd is handled specially, and that there may be
+        # several other such gotchas
+        shift;
+        die "cd: too many arguments: ", Dumper \@_ unless @_ <= 1;
+        chdir(shift() || $ENV{HOME});
+
     } elsif ($_[0] eq 'pl') {
         shift;
         my $e = join(" ", @_);
