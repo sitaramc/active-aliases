@@ -410,18 +410,20 @@ sub _capture {
         trace "-|open: ", Dumper \@_;
         open(my $fh, "-|", @_) or die "open failed: $!";
         my @ret = <$fh>;
-        chomp(@ret);
-        trace "-|read: " . scalar(@ret) . " items";
-        trace "-|read: ", Dumper \@ret if (@ret == 1);
         my $rc = close($fh);
-        interpret($?, $!);
+        $exit_code = interpret($?, $!);
+
+        chomp(@ret);
+        trace "-|read: " . scalar(@ret) . " items, rc=$rc, exit_code=$exit_code";
+        trace "-|read: ", Dumper \@ret if (@ret == 1);
         return \@ret;
 
     } elsif ($type eq '!sh') {
         my $cmd = join(" ", @_);
         trace "`:      $cmd";
         my @ret = `$cmd`;
-        interpret($?, $!);
+        $exit_code = interpret($?, $!);
+
         chomp(@ret);
         trace "` read: " . scalar(@ret) . " items";
         trace "` read: ", Dumper \@ret if (@ret == 1);
