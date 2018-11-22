@@ -476,26 +476,26 @@ t16d % % %
     || rc %2
     && rc %3
 #> t16a 0 0 0
-## a0b
-## a0b
-## a0b
+## exit:0
+## exit:0
+## exit:0
 #> t16b 0 0 1
-## a0b
+## exit:0
 #> t16c 0 2 0
-## a0b
-## a2b
-## a0b
+## exit:0
+## exit:2
+## exit:0
 #> t16d 0 1 2
-## a0b
-## a2b
+## exit:0
+## exit:2
 #> t16a 1 0 0
-## a1b
+## exit:1
 #> t16b 2 0 1
-## a2b
-## a0b
+## exit:2
+## exit:0
 #> t16c 2 1 0
-## a2b
-## a0b
+## exit:2
+## exit:0
 #> t16d 2 1 2
-## a2b
-## a1b
+## exit:2
+## exit:1
