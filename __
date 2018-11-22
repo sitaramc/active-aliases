@@ -495,7 +495,7 @@ sub _system {
         $exit_code = interpret($?, $!);
     }
 
-    if ( $rc != 0 ) {
+    if ( $rc ) {
         _warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code";
         # exit 1;
     }
