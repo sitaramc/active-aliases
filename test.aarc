@@ -536,6 +536,65 @@ t18b
     ! rc 0
     t18b0 %0
 t18b0 %
-    && echo got back: "%1" from the ! command
+    && echo got back: %1 from the ! command
 #> t18b
-## got back: "exit:0" from the ! command
+## got back: exit:0 from the ! command
+
+# --- quotewords
+
+# set 1
+t19a
+    args 'aa bb'
+t19b
+    sh args 'aa bb'
+t19c
+    exec args 'aa bb'
+#> t19a
+## a=aa bb.
+#> t19b
+## a=aa bb.
+#> t19c
+## a=aa bb.
+
+# set 2
+t19d
+    ! args 'aa bb'
+    args %0
+t19e
+    !sh args 'aa bb'
+    args %0
+#> t19d
+## a=a=aa bb..
+#> t19e
+## a=a=aa bb..
+
+# set 3
+t19f
+    args aa bb
+t19g
+    sh args aa bb
+t19h
+    exec args aa bb
+#> t19f
+## a=aa.
+## a=bb.
+#> t19g
+## a=aa.
+## a=bb.
+#> t19h
+## a=aa.
+## a=bb.
+
+# set 4
+t19i
+    ! args aa bb
+    args %0
+t19j
+    !sh args aa bb
+    args %0
+#> t19i
+## a=a=aa..
+## a=a=bb..
+#> t19j
+## a=a=aa..
+## a=a=bb..

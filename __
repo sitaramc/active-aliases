@@ -4,6 +4,7 @@ use warnings;
 use 5.10.0;
 use Data::Dumper;
 use List::Util qw(first);
+use Text::ParseWords;
 
 $Data::Dumper::Indent = 0;
 $Data::Dumper::Terse = 1;
@@ -106,7 +107,7 @@ sub dequeue {
             # get queued to later be processed by the rest of the rc lines),
             # or something to be executed immediately (see below).
             for my $sc (@commands) {
-                my @newcmd = interpolate([ split(' ', $sc) ], \@groups, \@tail);
+                my @newcmd = interpolate([ _split(' ', $sc) ], \@groups, \@tail);
 
                 if ($newcmd[0] eq '!'
                  or $newcmd[0] eq '!sh'
@@ -194,11 +195,11 @@ sub shemulate {
 sub interpolate {
     my ($cmd, $groups, $tail) = @_;
 
-    # allow passing in a string to be interpolated, as opposed to an array
-    if (not ref($cmd)) {
-        my @cmd = interpolate([ split(' ', $cmd) ], $groups, $tail);
-        return join(" ", @cmd);
-    }
+    # # allow passing in a string to be interpolated, as opposed to an array
+    # if (not ref($cmd)) {
+    #     my @cmd = interpolate([ split(' ', $cmd) ], $groups, $tail);
+    #     return join(" ", @cmd);
+    # }
 
     # a %. at the end says "don't attach the tail to me please!"
     if ($cmd->[-1] eq '%.') {
@@ -310,9 +311,6 @@ sub _commands {
     exit 0;
 }
 
-# ----------------------------------------------------------------------
-# routines at the next lower level of abstraction
-
 # return the next logical line.  When called with 'patt' as the argument,
 # return the next pattern line.  When called with 'blocks', return the
 # conditional block, if any, as a single string, followed by the command block
@@ -371,8 +369,21 @@ sub _eval {
     return $rc;
 }
 
-# ----------------------------------------------------------------------
-# general purpose routines
+sub _split {
+    my $s = $_[1];
+    # we ignore $_[0], which is a space
+
+    if ($s =~ /^(\+ )?(!sh|!pl|die|cd|pl|sh) /) {
+        # return normal split for cases where the eventual result will be
+        # "join"-ed again before being executed in some form.
+        return split(' ', $s);
+    } else {
+        # parse using shellwords where the result will stay an array even at
+        # the end (this boils down to the "! cmd arglist", "exec cmd arglist",
+        # and "cmd arglist" cases).
+        return shellwords($s);
+    }
+}
 
 sub get {
     my $lines = shift;
