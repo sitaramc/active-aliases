@@ -106,7 +106,12 @@ sub dequeue {
             # these are either commands to replace the current command (and
             # get queued to later be processed by the rest of the rc lines),
             # or something to be executed immediately (see below).
-            for my $sc (@commands) {
+            while (@commands) {
+                my $sc = shift @commands;
+                # handle \-continuations
+                while ($sc =~ s/\\\s*$//) {
+                    $sc .= shift(@commands);
+                }
                 my @newcmd = interpolate([ _split(' ', $sc) ], \@groups, \@tail);
 
                 if ($newcmd[0] eq '!'
