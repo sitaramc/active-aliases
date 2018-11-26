@@ -146,7 +146,7 @@ sub dequeue {
 sub match {
     my $patt = shift;
     my @cmd = @_;
-    trace "m.patt: $patt";
+    # trace "m.patt: $patt";
 
     my @patt = split ' ', $patt;
     my @groups = qw(dummy);
@@ -436,7 +436,7 @@ sub _capture {
 
     } elsif ($type eq '!sh') {
         my $cmd = join(" ", @_);
-        trace "`:      $cmd";
+        trace "` run:  $cmd";
         my @ret = `$cmd`;
         $exit_code = interpret($?, $!);
 
