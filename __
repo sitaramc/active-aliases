@@ -476,6 +476,10 @@ sub _system {
         shift;
         die join(" ", @_) . "\n";
 
+    } elsif ($_[0] eq 'exit') {
+        shift;
+        exit (shift() || 0);
+
     } elsif ($_[0] eq 'cd') {
         # XXX document that cd is handled specially, and that there may be
         # several other such gotchas
