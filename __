@@ -379,6 +379,7 @@ sub _split {
     my $s = $_[1];
     # we ignore $_[0], which is a space
 
+    # TBD handle && and || prefixes here also
     if ($s =~ /^(\+ )?(!sh|!pl|die|cd|pl|sh) /) {
         # return normal split for cases where the eventual result will be
         # "join"-ed again before being executed in some form.
