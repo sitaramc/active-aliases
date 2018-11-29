@@ -385,7 +385,7 @@ sub _split {
     # we ignore $_[0], which is a space
 
     # TBD handle && and || prefixes here also
-    if ($s =~ /^(\+ )?(!sh|!pl|die|cd|pl|sh) /) {
+    if ($s =~ /^(\+ )?(\? )?(!sh|!pl|die|cd|pl|sh) /) {
         # return normal split for cases where the eventual result will be
         # "join"-ed again before being executed in some form.
         return split(' ', $s);
@@ -470,10 +470,20 @@ sub _capture {
 # run a command, but first shemulate()
 sub _system {
     @_ = shemulate(@_);
+
     if ($_[0] eq '+') {
         shift @_;
         say STDERR join(" ", "+", @_);
     }
+
+    # was an exit code asked for?
+    my $ec_wanted = 0;
+    if ( $_[0] eq '?' ) {
+        $ec_wanted = 1;
+        shift;
+    }
+    # temporary local store for exit_code
+    my $ec = 0;
 
     # run system(), catch errors.  Be verbose only if $ENV{D} exists.  If not,
     # exit with <rc of system()> if it applies, else just "exit 1".
@@ -501,13 +511,13 @@ sub _system {
         trace "eval: $e";
         $rc = eval $e;
         trace "eval failed: $@" unless defined($rc);
-        $exit_code = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+        $ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
 
     } elsif ($_[0] eq 'sh') {
         shift;
         my $cmd = join(" ", @_);
         $rc = system("sh", "-c", $cmd);
-        $exit_code = interpret($?, $!);
+        $ec = interpret($?, $!);
 
     } elsif ($_[0] eq 'exec') {
         # NOTE: warn in docs about any subsequent queued items going bye-bye!
@@ -515,17 +525,19 @@ sub _system {
         # more commands and warn the user!
         shift;
         { $rc = exec(@_); }
-        $exit_code = interpret($?, $!) ;
+        $ec = interpret($?, $!) ;
 
     } else {
         $rc = system(@_);
-        $exit_code = interpret($?, $!);
+        $ec = interpret($?, $!);
     }
 
     if ( $rc ) {
-        _warn "WARNING: '" . join(" ", @_) . "' exited with $exit_code";
-        # exit 1;
+        _warn "WARNING: '" . join(" ", @_) . "' exited with $ec";
     }
+
+    # copy out the exit_code if it was wanted
+    $exit_code = $ec if $ec_wanted;
 }
 
 sub interpret {

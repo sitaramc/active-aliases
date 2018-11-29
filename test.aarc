@@ -192,7 +192,7 @@ _t13c_2
 ## hi there
 ## hi there
 Watch (\d+) %%
-    %2
+    ? %2
     # sleep %1
     _watch %? %1 %2
 _watch 0
@@ -207,7 +207,7 @@ _watch %
 ## hi there
 ## hi there
 Watch2 (\d+) %%
-    %2
+    ? %2
     # sleep %1
     && exec %aa Watch2 %1 %2
 
@@ -460,20 +460,20 @@ sf	echo find
 
 # ---- more && and || tests
 t16a % % %
-    rc %1
-    && rc %2
+    ? rc %1
+    && ? rc %2
     && rc %3
 t16b % % %
-    rc %1
-    || rc %2
+    ? rc %1
+    || ? rc %2
     || rc %3
 t16c % % %
-    rc %1
-    && rc %2
+    ? rc %1
+    && ? rc %2
     || rc %3
 t16d % % %
-    rc %1
-    || rc %2
+    ? rc %1
+    || ? rc %2
     && rc %3
 #> t16a 0 0 0
 ## exit:0
