@@ -113,7 +113,7 @@ t9 %
 ## not a tty
 t10
     !sh [ $_tty = 1 ] && echo IS || echo not ; :
-    echo %0 a tty
+    echo %! a tty
 
 #> t11
 ## this message should show up
@@ -301,7 +301,7 @@ each %% -- %
 ## a=/usr/bin/ls.
 vw %
     ! which %1
-    args vw: $EDITOR %0
+    args vw: $EDITOR %!
 
 # ---- backquotes
 #> vd 337 -337.
@@ -316,7 +316,7 @@ vw %
 ## a=1337.
 vd %%
     !sh seq 4444 | mg %1
-    vx %0
+    vx %!
 
 # ---- sh with arguments
 #> vg i creator
@@ -500,7 +500,7 @@ t16d % % %
 ## exit:2
 ## exit:1
 
-# ---- %? and %0 quirks caused by sequence of execution
+# ---- %? and %! quirks caused by sequence of execution
 # this next test is a demonstration of how %? from an immediate command does
 # not work within the same command block.  In t17a, you get no output at all,
 # while in t17b you get *both*.  That is because the sequence in which they
@@ -508,15 +508,15 @@ t16d % % %
 # If you look at it that way, you'll why the output makes sense
 t17a
     ! rc 0
-    && echo q = %? z = %0 extra:
+    && echo q = %? z = %! extra:
     ! rc 22
-    && echo q = %? z = %0 extra:
+    && echo q = %? z = %! extra:
 #> t17a
 t17b
     ! rc 22
-    && echo q = %? z = %0 extra:
+    && echo q = %? z = %! extra:
     ! rc 0
-    && echo q = %? z = %0 extra:
+    && echo q = %? z = %! extra:
 #> t17b
 ## q = 0 z = exit:22 extra:
 ## q = 0 z = exit:0 extra:
@@ -527,14 +527,14 @@ t17b
 # affect the exit code, which remains as the "!" command set it.
 t18a
     ! rc 22
-    t18a22 %0
+    t18a22 %!
 t18a22
     && echo exit code was 22 so this text should not show up
 #> t18a
 
 t18b
     ! rc 0
-    t18b0 %0
+    t18b0 %!
 t18b0 %
     && echo got back: %1 from the ! command
 #> t18b
@@ -559,10 +559,10 @@ t19c
 # set 2
 t19d
     ! args 'aa bb'
-    args %0
+    args %!
 t19e
     !sh args 'aa bb'
-    args %0
+    args %!
 #> t19d
 ## a=a=aa bb..
 #> t19e
@@ -588,10 +588,10 @@ t19h
 # set 4
 t19i
     ! args aa bb
-    args %0
+    args %!
 t19j
     !sh args aa bb
-    args %0
+    args %!
 #> t19i
 ## a=a=aa..
 ## a=a=bb..

@@ -215,6 +215,11 @@ sub interpolate {
 
     my @ret;
     for my $w (map $_, @$cmd) {
+        # replace %! with %0, wherever it may appear.  Internally, they are
+        # both the same, and you can use %0 in aa code if you like, but the
+        # *documented* variable is %!, because it follows the ! commands
+        $w =~ s/%!/%0/g;
+
         if ($w =~ /^%(\d+)$/) {
             $w = $groups->[$1];
             push @ret, deref($w);
