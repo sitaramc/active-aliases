@@ -231,7 +231,6 @@ sub interpolate {
         } else {
             $w =~ s/%(\d+)/deref($groups->[$1])/ge;
             $tail and ref($tail) and $w =~ s/%@/join(" ", @$tail)/ge and undef $tail;
-            # NOTE: possible join issues when you use $@ within a word instead of being a word by itself
             push @ret, $w;
         }
     }
@@ -498,8 +497,6 @@ sub _system {
         exit (shift() || 0);
 
     } elsif ($_[0] eq 'cd') {
-        # XXX document that cd is handled specially, and that there may be
-        # several other such gotchas
         shift;
         die "cd: too many arguments: ", Dumper \@_ unless @_ <= 1;
         chdir(shift() || $ENV{HOME});
@@ -520,9 +517,6 @@ sub _system {
         $ec = interpret($?, $!);
 
     } elsif ($_[0] eq 'exec') {
-        # NOTE: warn in docs about any subsequent queued items going bye-bye!
-        # (Or better yet, since the @queue is file scoped, detect if there are
-        # more commands and warn the user!
         shift;
         { $rc = exec(@_); }
         $ec = interpret($?, $!) ;
@@ -543,8 +537,6 @@ sub _system {
 sub interpret {
     my $q = shift;
     my $b = shift;
-    # XXX for now, the first two conditions below will kill the whole thing;
-    # but it is very likely we will have to revisit this later
     if ( $q == -1 ) {
         warn "failed to execute: $b\n";
         return -1;
