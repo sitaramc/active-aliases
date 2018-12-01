@@ -269,25 +269,16 @@ sub setup {
     # ----------------------------------------------------------------------
     # what rc file do we use?
 
-    if ($ENV{AA_RC} and -f $ENV{AA_RC}) {
-        @ARGV = ($ENV{AA_RC});  # only the one file in this case
-    } else {
-        @ARGV = ();
-        # first, the one from the current directory, but only if it is within $HOME
-        push @ARGV, "$ENV{PWD}/.aarc" if $ENV{PWD} ne $ENV{HOME}
-                              and !index($ENV{PWD},   $ENV{HOME})
-                                 and -f "$ENV{PWD}/.aarc";
-        # next, the one in ~, and then the one in ~/.config (note the latter
-        # one is called "aarc" not ".aarc")
-        push @ARGV, grep { -f } ( "$ENV{HOME}/.aarc", "$ENV{HOME}/.config/aarc" );
-        # the overall idea is that the one in ~/.config will be on all your
-        # machines (if you have a "dot file" git repo, for instance, it will
-        # have this), and the one in your ~ will be specific to this user (for
-        # example user versus root, or if, like me, you use different userids
-        # for different tasks)
-    }
+    @ARGV = ();
+
+    push @ARGV, $ENV{AA_RC} if $ENV{AA_RC} and -f $ENV{AA_RC};
+    push @ARGV, "$ENV{PWD}/.aarc" if $ENV{PWD} ne $ENV{HOME}
+                          and !index($ENV{PWD},   $ENV{HOME})
+                             and -f "$ENV{PWD}/.aarc";
+    push @ARGV, grep { -f } ( "$ENV{HOME}/.aarc", "$ENV{HOME}/.config/aarc" );
 
     my @lines = <>;     # which, as you know, eats up @ARGV;
+
     if ($ENV{AA_RC}) {
         # it could be a shell script with an active alias script embedded
         # within; search for the marker ("#!__" on a line by itself) and if it
