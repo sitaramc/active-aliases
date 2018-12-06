@@ -19,9 +19,13 @@ my @queue;
 # active aliases and the previous one.  It basically allows one command to
 # spawn multiple commands as it is processed.  Yes it's useful.  I think :)
 
+my $last_ec = 0;
+# this is the exit code from the last call to _system(); it will also be the
+# exit code for the entire run
 my $exit_code = 0;
-# this is global; we maintain exactly one exitcode, for the last executed
-# *external* command (however it was called)
+# this is the one that || and && use; it is only updated when asked for (by
+# "?").  Both $last_ec above as well as internal return values within
+# _capture() contribute to it
 
 setup();
 # deal with @ARGV, decide what rc files to use, and set up the queue
@@ -30,7 +34,7 @@ while (@queue) {
     dequeue();
 }
 
-exit $exit_code;
+exit $last_ec;
 
 # ----------------------------------------------------------------------
 
@@ -471,8 +475,6 @@ sub _system {
         $ec_wanted = 1;
         shift;
     }
-    # temporary local store for exit_code
-    my $ec = 0;
 
     if ($_[0] eq '+') {
         shift @_;
@@ -496,7 +498,7 @@ sub _system {
         die "cd: too many arguments: ", Dumper \@_ unless @_ <= 1;
         $rc = chdir(shift() || $ENV{HOME});
         trace "chdir failed: $!" unless $rc;
-        $ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+        $last_ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
 
     } elsif ($_[0] eq 'pl') {
         shift;
@@ -505,30 +507,30 @@ sub _system {
         trace "eval: $e";
         $rc = eval $e;
         trace "eval failed: $@" unless defined($rc);
-        $ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+        $last_ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
 
     } elsif ($_[0] eq 'sh') {
         shift;
         my $cmd = join(" ", @_);
         $rc = system("sh", "-c", $cmd);
-        $ec = interpret($?, $!);
+        $last_ec = interpret($?, $!);
 
     } elsif ($_[0] eq 'exec') {
         shift;
         { $rc = exec(@_); }
-        $ec = interpret($?, $!) ;
+        $last_ec = interpret($?, $!) ;
 
     } else {
         $rc = system(@_);
-        $ec = interpret($?, $!);
+        $last_ec = interpret($?, $!);
     }
 
     if ( $rc ) {
-        _warn "WARNING: '" . join(" ", @_) . "' exited with $ec";
+        _warn "WARNING: '" . join(" ", @_) . "' exited with $last_ec";
     }
 
     # copy out the exit_code if it was wanted
-    $exit_code = $ec if $ec_wanted;
+    $exit_code = $last_ec if $ec_wanted;
 }
 
 sub interpret {
