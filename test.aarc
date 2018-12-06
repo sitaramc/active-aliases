@@ -1,4 +1,5 @@
 # vim: ts=20:
+
 # ---- simple stuff
 #> t1 foo bar
 ## this is foo in t1 bar
@@ -112,7 +113,7 @@ t9 %
 #> t10 < /dev/null
 ## not a tty
 t10
-    !sh [ $_tty = 1 ] && echo IS || echo not ; :
+    ! sh [ $_tty = 1 ] && echo IS || echo not ; :
     echo %! a tty
 
 #> t11
@@ -307,7 +308,7 @@ vw %
 #> vd 337 -337. -4 1
 ## args: ["vim",1337]
 vd %%
-    !sh seq 4444 | mg %1
+    ! sh seq 4444 | mg %1
     vx %!
 
 # ---- sh with arguments
@@ -529,7 +530,7 @@ t19d
     ! args 'aa bb'
     args %!
 t19e
-    !sh args 'aa bb'
+    ! sh args 'aa bb'
     args %!
 #> t19d
 ## args: ["args: [\"aa bb\"]"]
@@ -555,7 +556,7 @@ t19i
     ! args aa bb
     args %!
 t19j
-    !sh args aa bb
+    ! sh args aa bb
     args %!
 #> t19i
 ## args: ["args: [\"aa\",\"bb\"]"]
@@ -570,3 +571,98 @@ t20 % %
 ## 32
 ## 22
 ## 12
+
+# ----------------------------------------------------------------------
+# !, ?, etc. (though some are already covered earlier)
+
+# !
+t21
+    ! echo hi
+    args %0
+t21a
+    ! echo hi %.
+    args %0
+#> t21
+## args: ["hi"]
+#> t21 foo
+## args: ["hi foo","foo"]
+#> t21a
+## args: ["hi"]
+#> t21a foo
+## args: ["hi","foo"]
+# ! +
+t22
+    ! + echo hi
+    args %0
+t22a
+    ! + echo hi %.
+    args %0
+#> t22
+## args: ["hi"]
+#> t22 foo
+## args: ["hi foo","foo"]
+#> t22a
+## args: ["hi"]
+#> t22a foo
+## args: ["hi","foo"]
+
+# ! sh
+t23
+    ! sh ls $HOME/.*bash* | grep rc %.
+    args %0
+#> t23
+## args: ["/home/sitaram/.bashrc"]
+#> t23 foo
+## args: ["/home/sitaram/.bashrc","foo"]
+# ! + sh
+t24
+    ! + sh ls $HOME/.*bash* | grep rc %.
+    args %0
+#> t24
+## args: ["/home/sitaram/.bashrc"]
+#> t24 foo
+## args: ["/home/sitaram/.bashrc","foo"]
+
+# pl and ! pl
+t25 %
+    + pl chdir "%1"
+    t25 %1
+t25
+    ! + pl -f ".bashrc" ? "yes" : "no" %.
+    args %0
+#> t25
+## args: ["no"]
+#> t25 $HOME
+## args: ["yes","/home/sitaram"]
+
+t26_0
+    pl 0
+    && echo hi
+t26_1
+    pl 1
+    && echo hi
+t26_0q
+    ? pl 0
+    && echo hi
+t26_1q
+    ? pl 1
+    && echo hi
+#> t26_0
+## hi
+#> t26_1
+## hi
+#> t26_0q
+#> t26_1q
+## hi
+t27
+    sh false
+    && echo hi
+    || echo there
+#> t27
+## hi
+t28
+    ? sh false
+    && echo hi
+    || echo there
+#> t28
+## there
