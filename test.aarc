@@ -296,34 +296,23 @@ each %% -- %
 
 # ---- safe backquotes
 #> vw ls
-## a=vw:.
-## a=vim.
-## a=/usr/bin/ls.
+## args: ["vw:","vim","/usr/bin/ls"]
 vw %
     ! which %1
     args vw: $EDITOR %!
 
 # ---- backquotes
 #> vd 337 -337.
-## a=vim.
-## a=337.
-## a=1337.
-## a=2337.
-## a=3337.
-## a=4337.
+## args: ["vim",337,1337,2337,3337,4337]
 #> vd 337 -337. -4 1
-## a=vim.
-## a=1337.
+## args: ["vim",1337]
 vd %%
     !sh seq 4444 | mg %1
     vx %!
 
 # ---- sh with arguments
 #> vg i creator
-## a=vg:.
-## a=vim.
-## a=-c.
-## a=Grep -i creator.
+## args: ["vg:","vim","-c","Grep -i creator"]
 vg i	vg -i
 vg w	vg -w
 vg %% i	vg %1 -i
@@ -342,41 +331,20 @@ vx
 
 # ---- sh with multiple quoted arguments
 #> vdd aa bb
-## a=vdd:.
-## a=vim.
-## a=-c.
-## a=syntax off.
-## a=-c.
-## a=DirDiff aa bb.
+## args: ["vdd:","vim","-c","syntax off","-c","DirDiff aa bb"]
 vdd % %
     sh args vdd: vim -c 'syntax off' -c 'DirDiff %1 %2'
 
 # ---- ew
 # for this test, we pretend rg does not exist and go straight to egrep
 #> ew dd
-## a=grep.
-## a=-E.
-## a=etc....
-## a=-r.
-## a=-i.
-## a=dd.
+## args: ["grep","-E","etc...","-r","-i","dd"]
 #> ew dD
-## a=grep.
-## a=-E.
-## a=etc....
-## a=-r.
-## a=dD.
+## args: ["grep","-E","etc...","-r","dD"]
 #> ew dD </dev/null
-## a=grep.
-## a=-E.
-## a=etc....
-## a=dD.
+## args: ["grep","-E","etc...","dD"]
 #> ew dd </dev/null
-## a=grep.
-## a=-E.
-## a=etc....
-## a=-i.
-## a=dd.
+## args: ["grep","-E","etc...","-i","dd"]
 # ew
 #     ?   -x "/usr/bin/rg" or -x "/usr/local/bin/rg" or -x "$ENV{HOME}/bin/rg"
 #     args rg -uu -g '!.git' -S
@@ -550,11 +518,11 @@ t19b
 t19c
     exec args 'aa bb'
 #> t19a
-## a=aa bb.
+## args: ["aa bb"]
 #> t19b
-## a=aa bb.
+## args: ["aa bb"]
 #> t19c
-## a=aa bb.
+## args: ["aa bb"]
 
 # set 2
 t19d
@@ -564,9 +532,9 @@ t19e
     !sh args 'aa bb'
     args %!
 #> t19d
-## a=a=aa bb..
+## args: ["args: [\"aa bb\"]"]
 #> t19e
-## a=a=aa bb..
+## args: ["args: [\"aa bb\"]"]
 
 # set 3
 t19f
@@ -576,14 +544,11 @@ t19g
 t19h
     exec args aa bb
 #> t19f
-## a=aa.
-## a=bb.
+## args: ["aa","bb"]
 #> t19g
-## a=aa.
-## a=bb.
+## args: ["aa","bb"]
 #> t19h
-## a=aa.
-## a=bb.
+## args: ["aa","bb"]
 
 # set 4
 t19i
@@ -593,11 +558,9 @@ t19j
     !sh args aa bb
     args %!
 #> t19i
-## a=a=aa..
-## a=a=bb..
+## args: ["args: [\"aa\",\"bb\"]"]
 #> t19j
-## a=a=aa..
-## a=a=bb..
+## args: ["args: [\"aa\",\"bb\"]"]
 
 t20 % %
     sh seq %1 | \

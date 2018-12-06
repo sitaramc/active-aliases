@@ -1,5 +1,8 @@
-#!/bin/bash
-for a
-do
-    echo a=$a.
-done
+#!/usr/bin/perl
+use 5.10.0;
+use Data::Dumper;
+$Data::Dumper::Terse = 1;
+$Data::Dumper::Useqq = 1;
+$Data::Dumper::Indent = 0;
+
+say "args: " . Dumper \@ARGV;
