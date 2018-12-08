@@ -73,7 +73,7 @@ sub dequeue {
             my @tail = @{ $res->[0] };
             my @groups = @{ $res->[1] };
             trace "cmd:    ", Dumper \@cmd;
-            trace "tails:  ", Dumper \@tail;
+            trace "tail:   ", Dumper \@tail;
             trace "groups: ", Dumper \@groups;
 
             my @subqueue = ();
@@ -91,6 +91,9 @@ sub dequeue {
             my $ccr = nextline('blocks', \@lines);    # cond + commands/replacement
             trace "ccr:    ", Dumper $ccr;
 
+            # warning: grab() is not currently used by any of my rulesets; it
+            # is therefore a candidate for removal if we continue to find no
+            # use for it
             %share = ( 'cmd' => \@cmd, 'tail' => \@tail, 'groups' => \@groups );
             sub grab {
                 # allows the perl block to grab stuff from the current lexical scope
