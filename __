@@ -416,7 +416,6 @@ sub unget {
 }
 
 sub _capture {
-    @_ = shemulate(@_);
     my $type = shift;
 
     if ($_[0] eq '+') {
@@ -429,6 +428,8 @@ sub _capture {
         $type = $type . $_[0];
         shift;
     }
+
+    @_ = shemulate(@_) unless $type eq '!pl';
 
     if ($type eq '!') {
         trace "-|open: ", Dumper \@_;
@@ -470,8 +471,6 @@ sub _capture {
 
 # run a command, but first shemulate()
 sub _system {
-    @_ = shemulate(@_);
-
     # was an exit code asked for?
     my $ec_wanted = 0;
     if ( $_[0] eq '?' ) {
@@ -483,6 +482,8 @@ sub _system {
         shift @_;
         say STDERR join(" ", "+", @_);
     }
+
+    @_ = shemulate(@_) unless $_[0] eq 'pl';
 
     # run system(), catch errors.  Be verbose only if $ENV{D} exists.  If not,
     # exit with <rc of system()> if it applies, else just "exit 1".
