@@ -1,0 +1,529 @@
+I have way too many small shell functions and aliases and shell scripts.
+
+Plus, in most of them, option/argument validation and processing is a pain,
+taking up far more code than the real action.
+
+# teaser examples
+
+1.  I want an alias `wg` that force-converts http to https then calls wget:
+
+        wg http://(.*)
+            wget https://%1
+
+    The url may not be the first argument, so cover that case also
+
+        wg %% http://(.*)
+            wget %1 https://%2
+
+2.  I often need to pipe something to `grep foo | grep bar | grep -v baz`
+    (find strings that contain foo AND bar but NOT baz).  I want an alias
+    `mg`, for multi-grep, that does this:
+
+        mg % %%
+            sh %aa mg %1 | %aa mg %2
+        mg -(.*)
+            mg -v %1
+        mg
+            grep -i
+
+    Now `... | mg foo bar -baz' will do what I described above.
+
+    If anyone can find a shell script that does this as intuitively/cleanly,
+    I'd like to hear about it.
+
+If you're wondering where I got this terrific (terrible?) idea from... have
+you ever maintained a sendmail address rewriting ruleset?
+
+# active aliases
+
+Anyway, "active aliases" is a somewhat pretentious name I cooked up for a tool
+that helps me with the problems I listed at the top.
+
+IMPORTANT NOTE: If you've used the previous version of active aliases, there
+are several syntactic differences, but **the biggest difference, by far, is
+that execution happens without going through the shell**.  This means files
+whose names contain shell meta-characters are safely handled.  Read on to see
+how this can be overridden if you need shell features such as globbing, pipes,
+redirection, etc.
+
+# rule files
+
+"aa" takes a set of rules and a command.  The rules are picked up from:
+
+1.  filename given in env var `AA_RC`, if it is set (see the section on
+    embedding *aa* for more on this).
+2.  `~/.aarc`, if it exists
+3.  `~/.config/aarc`, if it exists.  Note this is `aarc`, not `.aarc`.
+
+# command
+
+"aa" can be invoked like `aa alias args`; for example:
+
+    find | aa mg foo bar -baz
+
+But it is more convenient to do it by setting your shell's "command not found"
+handler to this:
+
+    command_not_found_handler () {
+            aa "$@"
+            exit $?
+    }
+    # NOTE: this is for zsh.  In bash this function is spelled without the 'r'
+    # at the end (i.e., command_not_found_handle) but otherwise it's the same.
+
+With this function defined, you can run an active alias directly, assuming it
+does not conflict with an existing command, function, or alias.  For example
+
+    find | mg foo bar -baz
+
+# rules: patterns, replacements, and matching
+
+A rule consists of a **pattern**, followed by **one or more replacements** to
+be applied if the command matches the pattern.
+
+The pattern starts at column 1, the replacements at column 5.
+
+Here's a quick one: show N most recent git commits, defaulting to 9
+
+    # running `glg 5` matches this pattern:
+    glg %
+        # and runs this command, with %1 replaced by 5:
+        git log --oneline -%1
+
+    # running `glg` (i.e., without any arguments) will not match the previous
+    # pattern, but will match this:
+    glg
+        # and runs this command
+        git log --oneline -9
+
+More than one arguments:
+
+    vdd % %
+        vim -c 'syntax off' -c 'DirDiff %1 %2'
+        # %1 is replaced by the first argument, %2 by the second
+
+**Hint** for people who know regexes, these are literally matched groups and
+references to them.
+
+Each `%` matches one word in the command, but sometimes you need to match an
+unknown number of words.  Here's an example that captures some frequently used
+`find` options and makes them easier to type:
+
+    # run `sf . -type f -s +50M -print` (for example)
+
+    # %% means "match ONE OR MORE words"
+    # however, this pattern does not match our command; move on to the next one
+    sf %% -n %
+        sf %1 -name %2
+
+    # nor does this; move on (remember it's a WORD match, so "-t" does not match "-type")
+    sf %% -t
+        sf %1 -mtime
+
+    # this matches.  Specifically, the %% matches ". -type f".  The arguments
+    # left over after the match ("+50M -print") become what is called the
+    # "tail", and are implicitly added to the replacement
+    sf %% -s
+        # the %1 is replaced by ". type f", and the -s becomes -size
+        sf %1 -size
+
+    # final rule: change the actual command to find and run it.  Notice how in
+    # this case pretty much the whole command is the "tail"
+    sf
+        find
+
+You can use your own regexes if you need to; here's one which extracts *part
+of* a URL:
+
+        # force wget to use https
+        wg http://(.*)
+            wget https://%1
+
+Combining this and the previous one about `%%`, let's cover for the fact that
+the URL is not always the first argument to wget:
+
+        wg %% http://(.*)
+            wget %1 https://%2
+
+# execution
+
+After all the rules have been exhausted, whatever remains is **executed**.
+
+By default, execution is NOT via the shell, but directly.
+
+        wg %% http://(.*)
+            # when matched, runs wget, with the rest as arguments
+            wget %1 https://%2
+
+This is the default because it lets us stop worrying about filenames with
+spaces, parentheses, brackets, and assorted nasties.
+
+But sometimes this is a problem:
+
+    vpl
+        vim *.pl
+        # WRONG!  runs vim with one argument: "*.pl", because there's no
+        # actual shell to do the globbing/filename expansion
+
+To make it go via the shell, prefix an `sh`:
+
+    vpl
+        sh vim *.pl
+
+Other examples of needing `sh` (in this case due to pipes and backticks):
+
+    rpman %
+        # show all man pages within an installed RPM package
+        sh man `rpm -qd %1 | grep man.man`
+
+**IMPORTANT NOTE**: For convenience, *aa* expands environment variables that
+exist, `~` if it appears at the start of a word, and `$$` (the current
+process's pid); you only need the `sh` prefix if you're using shell features
+other than these.
+
+# multiple replacement commands
+
+Earlier, we said "one or more replacements".  Here's an alias that prints the
+description, a blank line, and a columnated list of binaries, from a given RPM
+package, by running three different commands in sequence:
+
+    rpmq %
+        rpm -q --queryformat="%{DESCRIPTION}\\n" %1
+        echo
+        sh rpm -ql %1 | grep -w bin | column
+        # need `sh` prefix due to the pipes
+
+# conditionals
+
+The `sh` prefix only applies to one command, which can only span one line.
+You can use backslash-escaped continuation lines, just like in shell, but that
+is cumbersome and ugly if overused.
+
+*aa* can do conditionals.  Here's a simple example:
+
+    tb
+        ? pgrep -x thunderbird
+        && echo thunderbird is already running
+        || thunderbird
+
+Commands prefixed by `&&` run only if the exit code of the last command
+prefixed by `?` was zero (and similarly for `||` and non-zero).
+
+**IMPORTANT NOTE**: If you're used to shells chained `&&` and `||`, there is a
+significant difference, because in shell, it is the last command that ran
+whose exit code is used.  In *aa*, it is the last command that ran **which was
+prefixed by `?`**.
+
+The `?` can be combined with `sh` also:
+
+    backup
+        ? sh ip ro | grep default.via.172.25
+        # we're on a fast connection to the backup server
+        && ...full backup...
+        # we're on a slower connection
+        || ...backup only some directories...
+
+# special commands: cd, die, exec, exit
+
+Sometimes it's easier to use the special `die` command:
+
+    tb
+        ? pgrep -x thunderbird
+        && die thunderbird is already running
+        thunderbird
+
+`die` is treated internally, and exits with failure after printing the
+message.  As a result, you don't need `||` to shield the `thunderbird` command
+that follows.
+
+`cd` is another special command.  It is handled internally because it's an
+important shell builtin and does not make sense to run as an external command.
+
+`exit` is similar to die, but requires a numeric argument, which becomes the
+exit code for the program.
+
+And finally, `exec` is also allowed.  You don't often need it, but it comes in
+handy with loops in *aa*.  Here's an example:
+
+    avinfo % %%
+        avinfo %1
+        exec %aa avinfo %2
+
+    avinfo %
+        ...command(s) for 'avinfo' of one file...
+
+The crux of the looping is the `exec %aa`.  It's pretty similar to "tail
+recursion" in concept.  (The `%aa` is a special variable that gets replaced by
+the path to the *aa* program).
+
+# using captured output in a replacement command
+
+Consider this shell function:
+
+    vw {
+        vim `which $1`
+    }
+
+You can that in *aa* also:
+
+    vw %
+        sh vim `which %1`
+        # note the 'sh' in the above line
+
+But we'd like to avoid the shell as much as possible.  So we do this:
+
+    vw %
+    ! which %1
+    vim %!
+
+The `!` tells *aa* to run the command after it immediately, and capture its
+output.  In subsequent **replacement** commands, this is available as the
+special variable `%!`.
+
+Now, that seems like a pretty useless thing, because you could just do it the
+old-fashioned way (modulo shell-unsafe filenames), but the real use of this
+comes in when the output can be used in further transformations.
+
+    backup
+        ! hostname -s
+        backup_%!
+
+    backup_sitaram-home-lt
+        ...commands to backup home laptop...
+
+    backup_sitaram-work-lt
+        ...commands to backup work laptop...
+
+The `!` can be combined with `sh` too.  Here's one way to edit all files
+within the current directory which match a given pattern:
+
+    vd %
+        ! sh find . -name .git -prune -o -type f -print | grep -i %1
+        vim %!
+
+**NOTE**: when the `!` command returns multiple lines, each *line* becomes a
+separate argument, and `%!` interpolates them properly (i.e., as *separate*
+arguments).  In the example above, if there were files whose names contained
+spaces or other shell metas, it would still work fine.
+
+# other features
+
+The rest of this document is a brief listing of less often used features; ask
+if you would like any of them expanded upon.
+
+## `$` in a pattern
+
+Look at this example again:
+
+    glg %
+        git log --oneline -%1
+    glg
+        git log --oneline -9
+
+The git log command is repeated, which is not ideal (if it changes, you have
+to change it in two places).
+
+This is much better:
+
+    glg $
+        glg 9
+    glg %
+        git log --oneline -%1
+
+The `$` says "no more arguments", so it matches exactly `glg`.
+
+## error handling
+
+What if the user types in `glg foo`?  You get `fatal: unrecognized argument:
+-foo`, which is not very informative, mainly because you made *git* detect the
+error which your alias should have caught!
+
+Now try this:
+
+    glg $
+        glg 9
+    glg ([0-9]+)
+        git log --oneline -%1
+    glg
+        die argument must be numeric:
+
+Now walk through that mentally, with `glg foo` as the command+argument.
+
+**SIDE NOTE**: There's a lot of thought given to "where should error checking
+go", in many programming language designs.  For example, the above function,
+in bash, would require you to deal with errors first, and *then* move on to
+the real work.
+
+With *aa*, it is often more convenient and intuitive to deal with all the
+valid cases first, especially in short, simple, scripts that you'd like to get
+done quickly.
+
+## tail, `%@`, and `%.`
+
+You've seen the tail already in the `sf` (`find` command) example earlier.
+
+By default, the tail arguments are placed at the end.  But:
+
+    save
+        # explicitly place the tail arguments using %@
+        cp %@ ~/.save
+        du -sm ~/.save
+
+**The tail gets added to EVERY replacement command**:
+
+    save
+        cp %@ ~/.save
+        du -sm ~/.save
+        # tail arguments implicitly added to the "du" command also
+
+If you don't want that:
+
+    save
+        cp %@ ~/.save
+        du -sm ~/.save %.
+        # ending with special variable %. explicitly disables adding tail
+
+But honestly, if the tail arguments are NOT optional (as in this case), it's
+best to be explicit:
+
+    # explicit %%
+    save %%
+        # %1 instead of %@
+        cp %1 ~/.save
+        # no need for %. at the end
+        du -sm ~/.save
+
+The tail is really only useful when trailing arguments are **optional**.  That
+is, there may not be even one, so you can't use `%%` (remember, `%%` means
+"one or more words"), like in the `sf` example earlier.
+
+# more examples
+
+I'll probably keep adding to this section as and when something comes up.
+
+----
+
+I often want to know which (rpm) package a particular file or command belongs
+to.  What I want is something like this:
+
+    $ qf /etc/pinforc
+    pinfo-0.6.10-17.fc28.x86_64
+
+except that for *commands*, I don't even want to supply the full path.  For
+example, I found a program called "ab", and was curious what it was:
+
+    $ qf ab
+    httpd-tools-2.4.34-3.fc28.x86_64
+
+Here's the aa code:
+
+    qf (.*)/(.*)
+        rpm -qf %1/%2
+    qf % $
+        ! which %1
+        rpm -qf %!
+
+----
+
+Until ripgrep becomes as common as grep, when I'm on strange machines where I
+can't install system utilities, I will have to rely on grep, egrep, etc.
+Unfortunately, grep/egrep do not have an "rc" file to store commonly used
+options, but even if it did, it could not do the two things I really want:
+smartcase, and automatic recursion into `$PWD` when STDIN is not a pipe.
+
+So, here's a simple egrep wrapper that captures my simple needs.
+
+    ew (.*[A-Z].*)
+        _ew %1
+    ew %
+        _ew -i %1
+
+    _ew %%
+        ? test -t 0
+        && ew -r %1
+        || ew %1
+
+    ew
+        grep -E -D skip --exclude-dir=.git --color=auto -I
+
+The first 4 lines show a common idiom in aa: jumping over some code based on
+some condition.  Here, if the first arguments contains at least one uppercase
+letter, we replace the `ew` command with `_ew`.  This means the *second*
+pattern and its replacement command don't match, and so are skipped.
+
+On the other hand, if the first argument did NOT have any uppercase letters,
+then the *first* pattern and its replacement are skipped.  The *second* one
+matches, so the replacement now includes a `-i` (for "ignore case" in grep).
+
+At this point, the command is either `_ew string` or `_ew -i string`,
+depending on whether the string had an uppercase letter in it or not.
+
+The next few lines enables recursion if STDIN is not a pipe, using a
+conditional, which you've already seen above.
+
+**IMPORTANT NOTE**: although the `||` part is a no-op, you *do* need it, since
+you have to specify a replacement command for the else case also.
+
+Notice also that the command is now back to `ew` from being (temporarily)
+`_ew`.
+
+**SIDE NOTE**: when you feel tempted to use a shell conditional, like `! sh [
+... ]`, use the `test` command instead.  There are subtle differences between
+them, but by and large they're the same, and running the `test` command is
+much more efficient than starting up a full shell.
+
+# appendix 1: embedding *aa* rules in a normal script
+
+It is possible to get the benefit of *aa* argument parsing within a shell
+script.  See `examples/sf` for a good example.
+
+<!--
+
+DECIDE:
+-   should __END__ end the rules?
+-   do we need grab()
+
+DOC: 'x' are done, '-' are not done:
+
+x   tail
+    x   %@, %.
+x   exec
+    x   %aa
+x   sh
+-   pl
+x   ?, &&, ||
+    x   ? sh
+    -   %?
+x   !, %!
+    x   ! sh
+    -   ! pl
+x   shemulate: $$, ^~, $\w+, ${\w+}
+x   multiple commands
+    -   the queue
+
+-   +
+-   D=1
+x   cd, die, exit
+
+-   embedded aa, AA_RC, "#!__"
+
+-   newlines embedded in args are arg separators
+
+-   \-continuations
+
+-   the whole shellwords thing (for foo, ! foo, exec foo)
+
+-   shell assumptions
+    -   globbing won't work
+    -   aliases and functions won't work
+    -   umask won't work as is (and I don't want to custom-case it)
+
+-   on interpolating %?: it must be a word by itself; for example: "echo foo
+    %?, bar" won't work because of the comma
+-   possible join issues when using %@ within a word instead of alone
+-   a return from "!" or "?   <perl code>" that consists of a single "0" will
+    not be recognised
+
+-   _commands
+
+-->
