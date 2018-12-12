@@ -1,0 +1,139 @@
+#!/usr/bin/perl -s
+
+# TODO: markdown header with -mh (i.e., each patt to be prefixed with "^#.*").
+# A naive implementation may require "/m" flag, maybe other complications
+#
+# mg -- multi-grep
+# 
+# mg behaves like simple grep (i.e., line by line), when no options are
+# passed.  So don't do that!
+#
+# Its main uses are to (a) allow negatives in list of filter criteria, (b)
+# allow filtering based on paragraphs (not just lines) and (b) allow taking
+# filenames from STDIN.
+#
+#   -x  STDIN is a list of filenames, not data.  This is the only way you can
+#       supply a list of filenames, because arguments are always search terms.
+#   -p  search and report by para.
+#   -s  search and report by markdown-section.  No cognizance of section level
+#       is taken.
+#   -l  like grep's -l, but remember filenames only come from STDIN!
+#
+# Quirks:
+# - when using para mode (-p) with a list of files (-x), the current file NAME
+#   is treated as if it were also part of the text being matched.  Yes there's
+#   a reason for this.  No it would not make sense to do this in line-by-line
+#   mode.
+
+use strict;
+use warnings;
+use 5.10.0;
+use Data::Dumper;
+
+our($x, $p, $l, $s);
+die "-p and -s are mutually exclusive\n" if $p and $s;
+
+my $exitcode = 1;
+
+# arguments are always search terms
+my @yes = _keys(1, @ARGV);
+my @no = _keys(0, @ARGV);
+say STDERR Dumper \@yes, \@no if $ENV{D};
+@ARGV = ();
+
+# $x means input and output is a list of filenames, not actual data
+my @files = qw(-);
+@files = <> if $x;
+chomp(@files);
+
+# search and report by para
+$/ = "" if $p;
+# unfortunately $s is a bit kludgey if you do it via $/, since that is the
+# record separator.  I.e. it comes at the end, like a newline, while markdown
+# section header is at the beginning, conceptually.
+
+my $t;
+for my $f (@files) {
+    _grep($f);
+}
+
+exit $exitcode;
+
+sub _grep {
+    my $f = shift;
+    my $f_is_printed = 0;
+
+    if ($f eq '-') {
+        open(F, "<-") or die "'$f': $!";
+    } else {
+        open(F, "<", $f) or die "'$f': $!";
+    }
+
+    while(<F>) {
+        next if $s and not collect_mkd_sec($_, eof F);    # also sets $_
+        if ( _mg($p ? "$f $_" : $_) ) {
+            $exitcode = 0;
+            if ($l) {
+                print "$f\n";
+                last;
+            } else {
+                print "==> $f <==\n\n" if $x and not $f_is_printed++;
+                print $_;
+            }
+        }
+    }
+    close F;
+}
+
+{
+    my $ipst;       # in progress section text being collected
+    sub collect_mkd_sec {
+        my $t = shift;
+        my $eof = shift;
+
+        if ($t =~ /^#/) {
+            # new section starting
+            $_ = $ipst;
+            $ipst = $t;
+            return 1 if $_;
+            return 0;   # (the very first line is a section header)
+        }
+        if ($eof) {
+            # $t is part of current in-progress section text, not *next* one
+            $_ = ($ipst || '') . $t;
+            $ipst = '';    # reset for NEXT file!
+            return 1;
+            # XXX does this section play well with empty files?
+        }
+
+        $ipst .= $t;
+        return 0;
+    }
+}
+
+sub _keys {
+    if ( +shift() ) {
+        _smartcase( grep { ! /^-/ } @_ );
+    } else {
+        _smartcase( map { s/^-//; $_ } grep { /^-/ } @_ );
+    }
+}
+sub _smartcase {
+    for my $k (@_) {
+        $k = "(?i)$k" unless $k =~ /[A-Z]/;
+    }
+    @_;
+}
+
+sub _mg {
+    my $t = shift;
+
+    for my $k (@yes) {
+        return 0 unless $t =~ /$k/;
+    }
+    for my $k (@no) {
+        return 0 if $t =~ /$k/;
+    }
+
+    return 1;
+}

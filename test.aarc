@@ -1,0 +1,668 @@
+# vim: ts=20:
+
+# ---- simple stuff
+#> t1 foo bar
+## this is foo in t1 bar
+#> t1 foo
+## this is foo in t1
+#> t1
+## this is t1
+t1 %
+    echo this is %1 in t1
+t1
+    echo this is t1
+
+# ---- chaining
+#> t2
+## this is t2 and baz bar
+#> t2 foo
+## this is t2 and baz bar foo
+#> t2 foo fighter
+## this is t2 and baz bar foo fighter
+t2
+    t2 bar
+t2
+    t2 baz
+t2
+    echo this is t2 and
+
+# ---- multiple commands
+#> t3
+## this is t3 line 1
+## this is t3 line 2
+t3
+    echo this is t3 line 1
+    echo this is t3 line 2
+
+# ---- multiple commands + chaining
+#> t4
+## this is t4 line 1
+## this is t4 line 2 bar
+## this is t4 ending bar
+t4
+    echo this is t4 line 1
+    t4 bar
+t4
+    echo this is t4 line 2
+    echo this is t4 ending
+
+# ---- force at least one tail argument
+#> t5
+## 
+t5 @
+    echo this is t5 line 1
+    echo this is t5 ending
+
+# ---- multiple commands + chaining + regex
+#> t6
+## t6 got nothing
+#> t6 abc
+## t6 got something: abc
+#> t6 1
+## t6 got number: 1
+#> t6 2
+## t6 got number: 2
+#> t6 12
+## t6 got number: 12
+t6 (\d+)
+    echo t6 got number: %1
+t6 %
+    echo t6 got something: %1
+t6
+    echo t6 got nothing
+
+# # ---- mangle, map
+# #> t7
+# ## /home/user bar
+# #> t7 foo
+# ## /home/user bar foo
+# t7
+#     t7 %HOME/bar
+# t7
+#     %map m(%HOME/(.*)) ? ("/home/user", $1) : $_
+# t7
+#     echo
+
+# ---- mangle, each
+#> t8 one two
+## this is one in t1
+## this is two in t1
+t8 % %%
+    _t8_do1 %1
+    exec %aa t8 %2
+t8 %
+    _t8_do1 %1
+
+_t8_do1 %
+    %aa t1 %1
+
+# ---- shell
+#> t9 .bashrc
+## /home/sitaram
+## $HOMEE
+## /home/sitaram/.bashrc
+t9 %
+    ?   $ENV{FOO} = "%1"; 1
+    echo $HOME
+    echo $HOMEE
+    ls ~/$FOO
+
+# ---- preamble + little shell + env var snippets; note the trailing "; :"
+#> t10
+## IS a tty
+#> t10 < /dev/null
+## not a tty
+t10
+    ! sh [ $_tty = 1 ] && echo IS || echo not ; :
+    echo %! a tty
+
+#> t11
+## this message should show up
+t11
+    ?   0
+    echo this message should not show up
+t11
+    echo this message should show up
+
+# ---- each
+#> t12 a b c
+## pre a post
+## pre b post
+## pre c post
+t12 % %%
+    _t12 %1
+    exec %aa t12 %2
+t12 %
+    _t12 %1
+_t12 %
+    echo pre %1 post
+
+# ---- queue inversion
+#> t13a
+## 1e: a b c
+## 2: d
+t13a
+    _t13a_1 a b c
+    _t13a_2 d
+_t13a_1
+    _t13a_1e
+_t13a_1e
+    echo 1e:
+_t13a_2
+    echo 2:
+#> t13b
+## 1e: a
+## 1e: b
+## 1e: c
+## 2: d
+t13b
+    _t13b_1 a b c
+    _t13b_2 d
+_t13b_1 % %%
+    _t13b_1e %1
+    # this one is dangerous if the number of arguments are too many
+    %aa _t13b_1 %2
+_t13b_1 %
+    _t13b_1e %1
+_t13b_1e
+    echo 1e:
+_t13b_2
+    echo 2:
+#> t13c
+## 1e: a
+## 1e: b
+## 1e: c
+t13c
+    _t13c_1 a b c
+    # this one doesn't run!  XXX warning in docs needed
+    _t13c_2 d
+_t13c_1 % %%
+    _t13c_1e %1
+    exec %aa _t13c_1 %2
+_t13c_1 %
+    _t13c_1e %1
+_t13c_1e
+    echo 1e:
+_t13c_2
+    echo 2:
+
+# ---- watch
+#> Watch 1 echo hi there | head -4
+## hi there
+## hi there
+## hi there
+## hi there
+Watch (\d+) %%
+    ? %2
+    # sleep %1
+    _watch %? %1 %2
+_watch 0
+    exec %aa Watch
+_watch %
+    true
+
+# ---- watch2
+#> Watch2 1 echo hi there | head -4
+## hi there
+## hi there
+## hi there
+## hi there
+Watch2 (\d+) %%
+    ? %2
+    # sleep %1
+    && exec %aa Watch2 %1 %2
+
+# ---- %%
+#> t15 a1 d4
+## slow a1 -d 4
+#> t15 d4 e5
+## slow -d 4 e5
+#> t15 a1 u4
+## slow a1 -u 4
+#> t15 u4 e5
+## slow -u 4 e5
+#> t15 d4 u5
+## slow -d 4 -u 5
+#> t15 u5 d4
+## slow -u 5 -d 4
+t15 u(\d+)	t15 -u %1
+t15 d(\d+)	t15 -d %1
+t15 %% u(\d+)	t15 %1 -u %2
+t15 %% d(\d+)	t15 %1 -d %2
+t15
+    echo slow
+
+# ---- cart prod
+cartprod % %% // %%
+    %aa cartprod %1 // %3
+    %aa cartprod %2 // %3
+cartprod % // % %%
+    echo %1 %2
+    %aa cartprod %1 // %3
+cartprod % // %
+    echo %1 %2
+#> cartprod a // b
+## a b
+#> cartprod a // b c
+## a b
+## a c
+#> cartprod a b // c
+## a c
+## b c
+#> cartprod a b // c d
+## a c
+## a d
+## b c
+## b d
+#> cartprod a b // c d e
+## a c
+## a d
+## a e
+## b c
+## b d
+## b e
+#> cartprod a b c // d e f
+## a d
+## a e
+## a f
+## b d
+## b e
+## b f
+## c d
+## c e
+## c f
+#> cartprod a b c d // e
+## a e
+## b e
+## c e
+## d e
+#> cartprod a // b c d e
+## a b
+## a c
+## a d
+## a e
+
+
+# ---- each with command+arguments
+each %% -- % %%
+    sh %1 %2
+    exec %aa each %1 -- %3
+each %% -- %
+    sh %1 %2
+#> each echo a b c -- 1 2 3 4
+## a b c 1
+## a b c 2
+## a b c 3
+## a b c 4
+
+# ---- safe backquotes
+#> vw ls
+## args: ["vw:","vim","/usr/bin/ls"]
+vw %
+    ! which %1
+    args vw: $EDITOR %!
+
+# ---- backquotes
+#> vd 337 -337.
+## args: ["vim",337,1337,2337,3337,4337]
+#> vd 337 -337. -4 1
+## args: ["vim",1337]
+vd %%
+    ! sh seq 4444 | mg %1
+    vx %!
+
+# ---- sh with arguments
+#> vg i creator
+## args: ["vg:","vim","-c","Grep -i creator"]
+vg i	vg -i
+vg w	vg -w
+vg %% i	vg %1 -i
+vg %% w	vg %1 -w
+vg iw	vg -i -w
+vg %% iw	vg %1 -i -w
+vg wi	vg -i -w
+vg %% wi	vg %1 -i -w
+
+vg %%	sh args vg: $EDITOR -c 'Grep %1'
+
+# %shell args vg: $EDITOR -c 'Grep %@'
+
+vx
+    args vim
+
+# ---- sh with multiple quoted arguments
+#> vdd aa bb
+## args: ["vdd:","vim","-c","syntax off","-c","DirDiff aa bb"]
+vdd % %
+    sh args vdd: vim -c 'syntax off' -c 'DirDiff %1 %2'
+
+# ---- ew
+# for this test, we pretend rg does not exist and go straight to egrep
+#> ew dd
+## args: ["grep","-E","etc...","-r","-i","dd"]
+#> ew dD
+## args: ["grep","-E","etc...","-r","dD"]
+#> ew dD </dev/null
+## args: ["grep","-E","etc...","dD"]
+#> ew dd </dev/null
+## args: ["grep","-E","etc...","-i","dd"]
+# ew
+#     ?   -x "/usr/bin/rg" or -x "/usr/local/bin/rg" or -x "$ENV{HOME}/bin/rg"
+#     args rg -uu -g '!.git' -S
+ew %
+    ?   "%1" !~ /[A-Z]/
+    ew -i %1
+ew
+    ?   $ENV{_tty}
+    ew -r
+ew
+    args grep -E etc...
+
+# ---- sh-perl
+shperl	sh perl -E 'say 1; say 2'
+#> shperl
+## 1
+## 2
+
+# ---- nosh-perl with multiple arguments
+noshperl %%
+    perl -E %1
+#> noshperl 'say 1; say 2'
+## 1
+## 2
+
+# ---- sf (find)
+# (see sample.aarc)
+sf $
+    ?   say "sf [path] [pattern] [options]
+            options can be -r (use iregex instead of iname), -f/d/l (-type f/d/l
+            respectively, -d (maxdepth), -m/c (mmin/cmin), -s (size).  The last 4
+            options must be followed by an appropriate argument."
+    die
+sf %
+    ?   ! -d "%1"
+    sf . %1
+sf % -(.*)	_sf %1 -%2
+sf % %	_sf %1 -n %2
+_sf	sf
+sf %% -n %% -r	sf %1 -r %2
+sf %% -(f|d|l)	sf %1 -type %2
+sf %% -n %	sf %1 -iname *%2*
+sf %% -r %	sf %1 -iregex .*%2.*
+sf %% -d (\d+)	sf %1 -maxdepth %2
+sf %% -m (.\d+)	sf %1 -mmin %2
+sf %% -c (.\d+)	sf %1 -cmin %2
+sf %% -s (.\d+)	sf %1 -size %2k
+sf %% -s (.\d+)[kK]	sf %1 -size %2k
+sf %% -s (.\d+)[mM]	sf %1 -size %2M
+sf %% -s (.\d+)[gG]	sf %1 -size %2G
+sf	echo find
+#> sf
+## sf [path] [pattern] [options]
+##     options can be -r (use iregex instead of iname), -f/d/l (-type f/d/l
+##     respectively, -d (maxdepth), -m/c (mmin/cmin), -s (size).  The last 4
+##     options must be followed by an appropriate argument.
+#> sf -s 10
+## find . -size 10k
+#> sf foo
+## find . -iname *foo*
+#> sf foo -r
+## find . -iregex .*foo.*
+#> sf foo -s 10
+## find . -iname *foo* -size 10k
+#> sf foo -s +10m
+## find . -iname *foo* -size +10M
+#> sf helpers
+## find helpers
+#> sf helpers bar
+## find helpers -iname *bar*
+#> sf helpers bar -r
+## find helpers -iregex .*bar.*
+#> sf helpers -s 10
+## find helpers -size 10k
+#> sf helpers bar -s 10
+## find helpers -iname *bar* -size 10k
+#> sf helpers -s +10m
+## find helpers -size +10M
+#> sf helpers bar -s -1g
+## find helpers -iname *bar* -size -1G
+
+# ---- more && and || tests
+t16a % % %
+    ? rc %1
+    && ? rc %2
+    && rc %3
+t16b % % %
+    ? rc %1
+    || ? rc %2
+    || rc %3
+t16c % % %
+    ? rc %1
+    && ? rc %2
+    || rc %3
+t16d % % %
+    ? rc %1
+    || ? rc %2
+    && rc %3
+#> t16a 0 0 0
+## exit:0
+## exit:0
+## exit:0
+#> t16b 0 0 1
+## exit:0
+#> t16c 0 2 0
+## exit:0
+## exit:2
+## exit:0
+#> t16d 0 1 2
+## exit:0
+## exit:2
+#> t16a 1 0 0
+## exit:1
+#> t16b 2 0 1
+## exit:2
+## exit:0
+#> t16c 2 1 0
+## exit:2
+## exit:0
+#> t16d 2 1 2
+## exit:2
+## exit:1
+
+# ---- %? and %! quirks caused by sequence of execution
+# this next test is a demonstration of how %? from an immediate command does
+# not work within the same command block.  In t17a, you get no output at all,
+# while in t17b you get *both*.  That is because the sequence in which they
+# *actually* execute is: both the "!" lines, then both the "&& echo" lines.
+# If you look at it that way, you'll why the output makes sense
+t17a
+    ! rc 0
+    && echo q = %? z = %! extra:
+    ! rc 22
+    && echo q = %? z = %! extra:
+#> t17a
+t17b
+    ! rc 22
+    && echo q = %? z = %! extra:
+    ! rc 0
+    && echo q = %? z = %! extra:
+#> t17b
+## q = 0 z = exit:22 extra:
+## q = 0 z = exit:0 extra:
+
+# ---- how to use the exit code of a ! command to *actually* decide the next step
+# well, all you have to do is run it in a *different* command block. Just
+# transform to a new command immediately after the "!" command; this does not
+# affect the exit code, which remains as the "!" command set it.
+t18a
+    ! rc 22
+    t18a22 %!
+t18a22
+    && echo exit code was 22 so this text should not show up
+#> t18a
+
+t18b
+    ! rc 0
+    t18b0 %!
+t18b0 %
+    && echo got back: %1 from the ! command
+#> t18b
+## got back: exit:0 from the ! command
+
+# --- quotewords
+
+# set 1
+t19a
+    args 'aa bb'
+t19b
+    sh args 'aa bb'
+t19c
+    exec args 'aa bb'
+#> t19a
+## args: ["aa bb"]
+#> t19b
+## args: ["aa bb"]
+#> t19c
+## args: ["aa bb"]
+
+# set 2
+t19d
+    ! args 'aa bb'
+    args %!
+t19e
+    ! sh args 'aa bb'
+    args %!
+#> t19d
+## args: ["args: [\"aa bb\"]"]
+#> t19e
+## args: ["args: [\"aa bb\"]"]
+
+# set 3
+t19f
+    args aa bb
+t19g
+    sh args aa bb
+t19h
+    exec args aa bb
+#> t19f
+## args: ["aa","bb"]
+#> t19g
+## args: ["aa","bb"]
+#> t19h
+## args: ["aa","bb"]
+
+# set 4
+t19i
+    ! args aa bb
+    args %!
+t19j
+    ! sh args aa bb
+    args %!
+#> t19i
+## args: ["args: [\"aa\",\"bb\"]"]
+#> t19j
+## args: ["args: [\"aa\",\"bb\"]"]
+
+t20 % %
+    sh seq %1 | \
+        grep %2 | \
+        tac
+#> t20 33 .2
+## 32
+## 22
+## 12
+
+# ----------------------------------------------------------------------
+# !, ?, etc. (though some are already covered earlier)
+
+# !
+t21
+    ! echo hi
+    args %0
+t21a
+    ! echo hi %.
+    args %0
+#> t21
+## args: ["hi"]
+#> t21 foo
+## args: ["hi foo","foo"]
+#> t21a
+## args: ["hi"]
+#> t21a foo
+## args: ["hi","foo"]
+# ! +
+t22
+    ! + echo hi
+    args %0
+t22a
+    ! + echo hi %.
+    args %0
+#> t22
+## args: ["hi"]
+#> t22 foo
+## args: ["hi foo","foo"]
+#> t22a
+## args: ["hi"]
+#> t22a foo
+## args: ["hi","foo"]
+
+# ! sh
+t23
+    ! sh ls $HOME/.*bash* | grep rc %.
+    args %0
+#> t23
+## args: ["/home/sitaram/.bashrc"]
+#> t23 foo
+## args: ["/home/sitaram/.bashrc","foo"]
+# ! + sh
+t24
+    ! + sh ls $HOME/.*bash* | grep rc %.
+    args %0
+#> t24
+## args: ["/home/sitaram/.bashrc"]
+#> t24 foo
+## args: ["/home/sitaram/.bashrc","foo"]
+
+# pl and ! pl
+t25 %
+    + pl chdir "%1"
+    t25 %1
+t25
+    ! + pl -f ".bashrc" ? "yes" : "no" %.
+    args %0
+#> t25
+## args: ["no"]
+#> t25 $HOME
+## args: ["yes","/home/sitaram"]
+
+t26_0
+    pl 0
+    && echo hi
+t26_1
+    pl 1
+    && echo hi
+t26_0q
+    ? pl 0
+    && echo hi
+t26_1q
+    ? pl 1
+    && echo hi
+#> t26_0
+## hi
+#> t26_1
+## hi
+#> t26_0q
+#> t26_1q
+## hi
+t27
+    sh false
+    && echo hi
+    || echo there
+#> t27
+## hi
+t28
+    ? sh false
+    && echo hi
+    || echo there
+#> t28
+## there

@@ -1,0 +1,565 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use 5.10.0;
+use Data::Dumper;
+use List::Util qw(first);
+use Text::ParseWords;
+
+$Data::Dumper::Indent = 0;
+$Data::Dumper::Terse = 1;
+$Data::Dumper::Useqq = 1;
+
+sub _warn;
+sub trace;
+
+my %share;
+my @queue;
+# the queue is one of the fundamental differences between this version of
+# active aliases and the previous one.  It basically allows one command to
+# spawn multiple commands as it is processed.  Yes it's useful.  I think :)
+
+my $last_ec = 0;
+# this is the exit code from the last call to _system(); it will also be the
+# exit code for the entire run
+my $exit_code = 0;
+# this is the one that || and && use; it is only updated when asked for (by
+# "?").  Both $last_ec above as well as internal return values within
+# _capture() contribute to it
+
+setup();
+# deal with @ARGV, decide what rc files to use, and set up the queue
+
+while (@queue) {
+    dequeue();
+}
+
+exit $last_ec;
+
+# ----------------------------------------------------------------------
+
+sub dequeue {
+    my @cmd   = @{ shift(@queue) };
+    my @lines = @{ shift(@queue) };
+    trace "";
+    trace "dequeue ", Dumper \@cmd;
+    # my @cmd = @{ +shift };
+    # my @lines = @{ +shift };
+
+    # deal with && and ||
+    if ($cmd[0] eq '&&' and $exit_code != 0 or
+        $cmd[0] eq '||' and $exit_code == 0 ) {
+        _warn "exit_code = $exit_code, skipping: ", join(" ", @cmd);
+        return;
+    }
+    shift @cmd if $cmd[0] eq '&&' or $cmd[0] eq '||';
+
+    # one special interpolation is done here: %?
+    map { $_ = $exit_code if $_ eq '%?' } @cmd;
+
+    while (my $line = nextline('patt', \@lines)) {
+        last if /__END__/;
+        chomp($line);
+
+        # match the current "pattern" line to the current command
+        my $res = match($line, @cmd);
+        if ($res) {
+            trace "pass:   $line";
+
+            # if the match succeeded, you get back a "tail", which is the list
+            # of arguments left over after the command matched the pattern
+            # (typically, a list of files to be processed), and a list of
+            # strings from matched "capture groups" in the pattern
+            my @tail = @{ $res->[0] };
+            my @groups = @{ $res->[1] };
+            trace "cmd:    ", Dumper \@cmd;
+            trace "tail:   ", Dumper \@tail;
+            trace "groups: ", Dumper \@groups;
+
+            my @subqueue = ();
+            # the purpose of the subqueue is that we push commands to it as
+            # they get queued while we process the command block, then we
+            # *unshift* the whole subqueue to the (front of) the main queue.
+            # Otherwise you get queueing inversions (e.g. q t1, q t2, but t1
+            # is actually t1a, t1b, t1c, and they all get queued, which means
+            # t2 runs before t1a/b/c)
+
+            # now grab the "body", which is the optional "condition" (block of
+            # perl code in a single string), and the list of (one or more)
+            # commands to run and/or replace the current one, but only if the
+            # first block returned true on eval (or was empty).
+            my $ccr = nextline('blocks', \@lines);    # cond + commands/replacement
+            trace "ccr:    ", Dumper $ccr;
+
+            # warning: grab() is not currently used by any of my rulesets; it
+            # is therefore a candidate for removal if we continue to find no
+            # use for it
+            %share = ( 'cmd' => \@cmd, 'tail' => \@tail, 'groups' => \@groups );
+            sub grab {
+                # allows the perl block to grab stuff from the current lexical scope
+                return @{ $share{shift()} };
+            }
+
+            # evaluate the condition, if it is present; bail if it returns false
+            if ($ccr->[0]) {
+                my $res = _eval($ccr->[0], @groups);
+                next unless $res;
+                $groups[0] = $res;  # the "dummy" slot can now be used!
+            }
+
+            # and now the commands...
+            my @commands = @{ $ccr->[1] };
+
+            # these are either commands to replace the current command (and
+            # get queued to later be processed by the rest of the rc lines),
+            # or something to be executed immediately (see below).
+            while (@commands) {
+                my $sc = shift @commands;
+                # handle \-continuations
+                while ($sc =~ s/\\\s*$//) {
+                    $sc .= shift(@commands);
+                }
+                my @newcmd = interpolate([ _split(' ', $sc) ], \@groups, \@tail);
+
+                if ($newcmd[0] eq '!') {
+                    # immediate execution; capture results (newline-separated)
+                    $groups[0] = _capture(@newcmd);
+                } else {
+                    # "processed by the rest of the rc lines" actually means
+                    # we add to the queue; see comments on 'queue' at the top.
+                    push @subqueue, [ @newcmd ];
+                }
+            }
+
+            unshift @queue, $_, [ @lines ] for reverse @subqueue;
+            return;
+        }
+    }
+
+    # what's left in @cmd at this point is what we need to run; this is *some*
+    # queued command that made it all the way through the remaining lines,
+    # without getting transformed.
+    trace "final:  ", Dumper \@cmd;
+    _system(@cmd);
+}
+
+# match the current pattern with the current @cmd.  Returns an empty array if
+# match fails, otherwise [ \@tail, \@groups ], where @tail is the part of @cmd
+# that did not get used up in matching with the pattern, and @groups is the
+# combined list of matched sub-expressions from all the capture groups,
+# including those representing a "%" (a whole word to be captured)
+sub match {
+    my $patt = shift;
+    my @cmd = @_;
+    # trace "m.patt: $patt";
+
+    my @patt = split ' ', $patt;
+    my @groups = qw(dummy);
+    # start with a dummy so indexing of the actual matched groups can be 1-based
+
+    # matching: the left side is the current command, right side is the pattern
+    my $cmd = join("\n", @cmd);
+    my $end;
+    if ($patt[-1] eq '$') {
+        pop @patt;
+        $end = '\Z';
+    } else {
+        $end = '(?:\n|$)';
+    }
+    $patt = join("\n", map { s/^%%$/([^\\x00]+)/; s/^%$/(.+)/; $_ } @patt);
+
+    if ($cmd =~ /\A$patt$end/) {
+        my @c = @{^CAPTURE};
+        push @groups, map { /\n/ ? [ split("\n", $_) ] : $_ } @c;
+        # now we need to find the tail
+        my @matched = split("\n", $&);
+        splice @cmd, 0, @matched;
+        return [ \@cmd, \@groups ];
+    }
+
+    return ();  # fail
+}
+
+# ----------------------------------------------------------------------
+# interpolate, and shemulate -- all of these have to do with munging the
+# command+arguments in some way
+
+# emulate shell, poorly :-)  Only $$, ~/, $var, and ${var} for now.  And for
+# the last two, only if the var in question actually exists.
+# 
+sub shemulate {
+    my @a = @_;
+    map { s(\$\$)($$)g } @a;
+    map { s(^~$)($ENV{HOME}) } @a;
+    map { s(^~/)($ENV{HOME}/) } @a;
+    map { s(\$(\w+))($ENV{$1} || '$' . $1)ge } @a;
+    map { s(\$\{(\w+)\})($ENV{$1} || '${' . $1 . '}')ge } @a;
+
+    # portability: replace "%aa" by $ENV{AA_BIN}
+    map { s(%aa)($ENV{AA_BIN}) } @a;
+
+    return @a;
+}
+
+# interpolate %1, %2, etc using matched groups found from match().  note that
+# some calls do not supply a tail at all, so you need to check for that too
+sub interpolate {
+    my ($cmd, $groups, $tail) = @_;
+
+    # # allow passing in a string to be interpolated, as opposed to an array
+    # if (not ref($cmd)) {
+    #     my @cmd = interpolate([ split(' ', $cmd) ], $groups, $tail);
+    #     return join(" ", @cmd);
+    # }
+
+    # a %. at the end says "don't attach the tail to me please!"
+    if ($cmd->[-1] eq '%.') {
+        pop @$cmd;
+        undef $tail;
+    }
+
+    my @ret;
+    for my $w (map $_, @$cmd) {
+        # replace %! with %0, wherever it may appear.  Internally, they are
+        # both the same, and you can use %0 in aa code if you like, but the
+        # *documented* variable is %!, because it follows the ! commands
+        $w =~ s/%!/%0/g;
+
+        if ($w =~ /^%(\d+)$/) {
+            $w = $groups->[$1];
+            push @ret, deref($w);
+        } elsif ($w eq '%@') {
+            # explicit positioning of the tail.  Logical conflict with %., but
+            # at the moment we don't detect/warn if both are used.
+            push @ret, @$tail;
+            undef $tail;
+        } else {
+            $w =~ s/%(\d+)/deref($groups->[$1])/ge;
+            $tail and ref($tail) and $w =~ s/%@/join(" ", @$tail)/ge and undef $tail;
+            push @ret, $w;
+        }
+    }
+
+    # otherwise, by default, attach the tail (if it exists) at the end
+    push @ret, @$tail if $tail and ref($tail);
+
+    return @ret;
+}
+
+sub deref {
+    my $x = shift;
+    return $x unless ref($x);
+    # we assume it's an array; we don't use hashes in this program
+    return @$x if wantarray;
+    return join " ", @$x;
+}
+
+sub setup {
+    die "Usage: $0 command [args]\n" unless @ARGV;
+    @ARGV = qw(_commands) if @ARGV == 1 and $ARGV[0] eq '-h';
+
+    # treat newlines embedded in arguments as argument separators.  This lets
+    # you operate on file lists, such as the output of "`find ...`" (note the
+    # double quotes).
+    @ARGV = split("\n", join("\n", @ARGV));
+
+    # the queue always contains an even number of entries, the first a ref to
+    # the current command, and the second a ref to a list of rc lines to be
+    # processed.  The first pair comes from the command line arguments and the
+    # entire contents of the rc files.  During processing of this pair, more
+    # pairs can be pushed to the end of the queue (but it will eventually run
+    # out, not to worry!)
+    push @queue, [ @ARGV ];     # this becomes the initial command
+
+    # ----------------------------------------------------------------------
+    # what rc file do we use?
+
+    @ARGV = ();
+
+    push @ARGV, $ENV{AA_RC} if $ENV{AA_RC} and -f $ENV{AA_RC};
+    push @ARGV, "$ENV{PWD}/.aarc" if $ENV{PWD} ne $ENV{HOME}
+                          and !index($ENV{PWD},   $ENV{HOME})
+                             and -f "$ENV{PWD}/.aarc";
+    push @ARGV, grep { -f } ( "$ENV{HOME}/.aarc", "$ENV{HOME}/.config/aarc" );
+
+    my @lines = <>;     # which, as you know, eats up @ARGV;
+
+    if ($ENV{AA_RC}) {
+        # it could be a shell script with an active alias script embedded
+        # within; search for the marker ("#!__" on a line by itself) and if it
+        # exists, delete everything upto the marker.
+        my $marker = first { $lines[$_] eq "#!__\n" } 0 .. $#lines;
+        splice @lines, 0, $marker+1 if defined($marker);
+    }
+    push @queue, \@lines;
+
+    # check if shell completion command requested
+    _commands();    # this does not return; exits after doing its thing
+
+    # ----------------------------------------------------------------------
+    # setup some env vars and such, for convenience
+
+    $ENV{_tty} = ( -t ? 1 : 0 );
+
+    use FindBin;
+    $ENV{AA_BIN} = $FindBin::Bin . "/" . $FindBin::Script;
+
+}
+
+sub _commands {
+    my @cmd  = @{ $queue[0] };
+    return unless @cmd == 1 and $cmd[0] eq '_commands';
+    my $lines = $queue[1];
+    for (@$lines) {
+        print if s/^## (\w+:)/$1/;
+    }
+
+    exit 0;
+}
+
+# return the next logical line.  When called with 'patt' as the argument,
+# return the next pattern line.  When called with 'blocks', return the
+# conditional block, if any, as a single string, followed by the command block
+# (as a reference to the list of commands to run)
+sub nextline {
+    my $want = shift;
+    my $lines =shift;
+    while (@$lines) {
+        if ($want eq 'patt') {
+            $_ = get($lines);
+            redo if /^\s/;  # code block lines from a failed pattern; skip
+            return $_;      # line starts with \S
+        }
+
+        # that leaves $want eq 'blocks'
+
+        my $cond = '';
+        my @newcmd = '';
+
+        $_ = get($lines);
+
+        if (s/^    \?   //) {
+            $cond = $_;
+            while ($_ = get($lines)) {
+                last unless s/^        //;
+                $cond .= $_;
+            }
+        }
+
+        if (s/^    //) {
+            @newcmd = ($_);
+            while ($_ = get($lines)) {
+                last unless s/^    //;
+                chomp;
+                push @newcmd, $_;
+            }
+        }
+
+        unget($_, $lines);
+
+        return [ $cond, \@newcmd ];
+    }
+}
+
+# just a perl eval, but first interpolate() groups found earlier by match()
+sub _eval {
+    my $e = shift;      # expression
+    # that leaves @groups in @_
+
+    # perl block needs to have line breaks preserved
+    $e = join("\n", interpolate([ split "\n", $e ], \@_));
+
+    trace "eval: $e";
+    my $rc = eval $e;
+    trace "eval failed: $@" unless defined($rc);
+    return $rc;
+}
+
+sub _split {
+    my $s = $_[1];
+    # we ignore $_[0], which is a space
+
+    # TBD handle && and || prefixes here also
+    if ($s =~ /^([!?] +)?(\+ +)?(sh|pl|die|cd) /) {
+        # return normal split for cases where the eventual result will be
+        # "join"-ed again before being executed in some form.
+        return split(' ', $s);
+    } else {
+        # parse using shellwords where the result will stay an array even at
+        # the end (this boils down to the "! cmd arglist", "exec cmd arglist",
+        # and "cmd arglist" cases).
+        return shellwords($s);
+    }
+}
+
+sub get {
+    my $lines = shift;
+    return "" unless @$lines;
+    my $r = shift @$lines;
+    while ($r =~ /^\s*#/ or $r =~ /^\s*$/) {
+        return "" unless @$lines;
+        $r = shift @$lines;
+    }
+
+    # support old syntax, at least for pattern+replacement (not pattern+replacement+condition)
+    if ($r =~ /(.*)\t(.*)/) {
+        unshift @$lines, "    $2";
+        $r = $1;
+    }
+
+    return $r;
+}
+sub unget {
+    my $l = shift;
+    my $lines = shift;
+    unshift @$lines, $l;
+}
+
+sub _capture {
+    my $type = shift;
+
+    if ($_[0] eq '+') {
+        shift @_;
+        say STDERR join(" ", $type, "+", @_);
+    }
+
+    # "! sh" -> "!sh", similarly for pl; makes it easier to check later
+    if ($_[0] eq 'sh' or $_[0] eq 'pl') {
+        $type = $type . $_[0];
+        shift;
+    }
+
+    @_ = shemulate(@_) unless $type eq '!pl';
+
+    if ($type eq '!') {
+        trace "-|open: ", Dumper \@_;
+        open(my $fh, "-|", @_) or die "open failed: $!";
+        my @ret = <$fh>;
+        my $rc = close($fh);
+        $exit_code = interpret($?, $!);
+
+        chomp(@ret);
+        trace "-|read: " . scalar(@ret) . " items, rc=$rc, exit_code=$exit_code";
+        trace "-|read: ", Dumper \@ret if (@ret == 1);
+        return \@ret;
+
+    } elsif ($type eq '!sh') {
+        my $cmd = join(" ", @_);
+        trace "` run:  $cmd";
+        my @ret = `$cmd`;
+        $exit_code = interpret($?, $!);
+
+        chomp(@ret);
+        trace "` read: " . scalar(@ret) . " items";
+        trace "` read: ", Dumper \@ret if (@ret == 1);
+        return \@ret;
+
+    } elsif ($type eq '!pl') {
+        my $e = join(" ", @_);
+
+        trace "!pl:    $e";
+        my $rc = eval $e;
+        trace "!pl got ", Dumper $rc;
+        trace "!fail:  $@" unless defined($rc);
+        $exit_code = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+        return $rc;
+
+    } else {
+        die "this should not happen!";
+    }
+}
+
+# run a command, but first shemulate()
+sub _system {
+    # was an exit code asked for?
+    my $ec_wanted = 0;
+    if ( $_[0] eq '?' ) {
+        $ec_wanted = 1;
+        shift;
+    }
+
+    if ($_[0] eq '+') {
+        shift @_;
+        say STDERR join(" ", "+", @_);
+    }
+
+    @_ = shemulate(@_) unless $_[0] eq 'pl';
+
+    # run system(), catch errors.  Be verbose only if $ENV{D} exists.  If not,
+    # exit with <rc of system()> if it applies, else just "exit 1".
+
+    my $rc;
+    if ($_[0] eq 'die') {
+        shift;
+        die join(" ", @_) . "\n";
+
+    } elsif ($_[0] eq 'exit') {
+        shift;
+        exit (shift() || 0);
+
+    } elsif ($_[0] eq 'cd') {
+        shift;
+        die "cd: too many arguments: ", Dumper \@_ unless @_ <= 1;
+        $rc = chdir(shift() || $ENV{HOME});
+        trace "chdir failed: $!" unless $rc;
+        $last_ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+
+    } elsif ($_[0] eq 'pl') {
+        shift;
+        my $e = join(" ", @_);
+
+        trace "eval: $e";
+        $rc = eval $e;
+        trace "eval failed: $@" unless defined($rc);
+        $last_ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+
+    } elsif ($_[0] eq 'sh') {
+        shift;
+        my $cmd = join(" ", @_);
+        $rc = system("sh", "-c", $cmd);
+        $last_ec = interpret($?, $!);
+
+    } elsif ($_[0] eq 'exec') {
+        shift;
+        { $rc = exec(@_); }
+        $last_ec = interpret($?, $!) ;
+
+    } else {
+        $rc = system(@_);
+        $last_ec = interpret($?, $!);
+    }
+
+    if ( $rc ) {
+        _warn "WARNING: '" . join(" ", @_) . "' exited with $last_ec";
+    }
+
+    # copy out the exit_code if it was wanted
+    $exit_code = $last_ec if $ec_wanted;
+}
+
+sub interpret {
+    my $q = shift;
+    my $b = shift;
+    if ( $q == -1 ) {
+        warn "failed to execute: $b\n";
+        return -1;
+    } elsif ( $q & 127 ) {
+        warn "child died with signal " . ( $q & 127 ) . "\n";
+        return -($q & 127);
+    } else {
+        my $ec = $q >> 8;
+        _warn "child exited with value $ec" if $ec;
+        return $ec;
+    }
+    return 0;
+}
+
+sub trace {
+    return unless $ENV{D};
+    say STDERR "[$$] ", @_;
+}
+
+sub _warn {
+    return unless defined $ENV{D};
+    say STDERR @_;
+}
