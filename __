@@ -67,7 +67,6 @@ sub dequeue {
     map { $_ = $exit_code if $_ eq '%?' } @cmd;
 
     while (my $line = nextline('patt', \@lines)) {
-        last if /__END__/;
         chomp($line);
 
         # match the current "pattern" line to the current command
