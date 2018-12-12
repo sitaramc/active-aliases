@@ -39,7 +39,10 @@ you ever maintained a sendmail address rewriting ruleset?
 Anyway, "active aliases" is a somewhat pretentious name I cooked up for a tool
 that helps me with the problems I listed at the top.
 
-IMPORTANT NOTE: If you've used the previous version of active aliases, there
+For historical reasons the actual program is called `__`, but you can call it
+whatever you want!
+
+**IMPORTANT NOTE**: If you've used the previous version of active aliases, there
 are several syntactic differences, but **the biggest difference, by far, is
 that execution happens without going through the shell**.  This means files
 whose names contain shell meta-characters are safely handled.  Read on to see
@@ -57,15 +60,15 @@ redirection, etc.
 
 # command
 
-"aa" can be invoked like `aa alias args`; for example:
+"aa" can be invoked like `__ alias args`; for example:
 
-    find | aa mg foo bar -baz
+    find | __ mg foo bar -baz
 
 But it is more convenient to do it by setting your shell's "command not found"
 handler to this:
 
     command_not_found_handler () {
-            aa "$@"
+            __ "$@"
             exit $?
     }
     # NOTE: this is for zsh.  In bash this function is spelled without the 'r'
