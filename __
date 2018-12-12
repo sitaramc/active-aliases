@@ -47,6 +47,15 @@ sub dequeue {
     # my @lines = @{ +shift };
 
     # deal with && and ||
+    # first: kill the next queued command (and its "lines") if the current one
+    # is a *successful* '&&', and the next one is a '||'.
+    if ($cmd[0] eq '&&' and $exit_code == 0) {
+        # first, delete the "||" that comes after this, if there is one
+        if (@queue and $queue[0][0] eq '||') {
+            shift(@queue);
+            shift(@queue);
+        }
+    }
     if ($cmd[0] eq '&&' and $exit_code != 0 or
         $cmd[0] eq '||' and $exit_code == 0 ) {
         _warn "exit_code = $exit_code, skipping: ", join(" ", @cmd);
@@ -84,12 +93,10 @@ sub dequeue {
             # is actually t1a, t1b, t1c, and they all get queued, which means
             # t2 runs before t1a/b/c)
 
-            # now grab the "body", which is the optional "condition" (block of
-            # perl code in a single string), and the list of (one or more)
-            # commands to run and/or replace the current one, but only if the
-            # first block returned true on eval (or was empty).
-            my $ccr = nextline('blocks', \@lines);    # cond + commands/replacement
-            trace "ccr:    ", Dumper $ccr;
+            # now grab the "body", which is the list of (one or more) commands
+            # to run and/or replace the current one
+            my $body = nextline('body', \@lines);    # replacement commands
+            trace "body:   ", Dumper $body;
 
             # warning: grab() is not currently used by any of my rulesets; it
             # is therefore a candidate for removal if we continue to find no
@@ -100,15 +107,8 @@ sub dequeue {
                 return @{ $share{shift()} };
             }
 
-            # evaluate the condition, if it is present; bail if it returns false
-            if ($ccr->[0]) {
-                my $res = _eval($ccr->[0], @groups);
-                next unless $res;
-                $groups[0] = $res;  # the "dummy" slot can now be used!
-            }
-
             # and now the commands...
-            my @commands = @{ $ccr->[1] };
+            my @commands = @$body;
 
             # these are either commands to replace the current command (and
             # get queued to later be processed by the rest of the rc lines),
@@ -212,6 +212,10 @@ sub interpolate {
     #     return join(" ", @cmd);
     # }
 
+    if ($cmd->[0] eq 'pl' or
+        $cmd->[1] eq 'pl' and ( $cmd->[0] eq '!' or $cmd->[0] eq '?' ) ) {
+        push @$cmd, '%.';
+    }
     # a %. at the end says "don't attach the tail to me please!"
     if ($cmd->[-1] eq '%.') {
         pop @$cmd;
@@ -318,9 +322,8 @@ sub _commands {
 }
 
 # return the next logical line.  When called with 'patt' as the argument,
-# return the next pattern line.  When called with 'blocks', return the
-# conditional block, if any, as a single string, followed by the command block
-# (as a reference to the list of commands to run)
+# return the next pattern line.  When called with 'body', return the command
+# block (as a reference to the list of commands to run)
 sub nextline {
     my $want = shift;
     my $lines =shift;
@@ -331,21 +334,11 @@ sub nextline {
             return $_;      # line starts with \S
         }
 
-        # that leaves $want eq 'blocks'
+        # that leaves $want eq 'body'
 
-        my $cond = '';
-        my @newcmd = '';
+        my @newcmd;
 
         $_ = get($lines);
-
-        if (s/^    \?   //) {
-            $cond = $_;
-            while ($_ = get($lines)) {
-                last unless s/^        //;
-                $cond .= $_;
-            }
-        }
-
         if (s/^    //) {
             @newcmd = ($_);
             while ($_ = get($lines)) {
@@ -357,22 +350,8 @@ sub nextline {
 
         unget($_, $lines);
 
-        return [ $cond, \@newcmd ];
+        return \@newcmd;
     }
-}
-
-# just a perl eval, but first interpolate() groups found earlier by match()
-sub _eval {
-    my $e = shift;      # expression
-    # that leaves @groups in @_
-
-    # perl block needs to have line breaks preserved
-    $e = join("\n", interpolate([ split "\n", $e ], \@_));
-
-    trace "eval: $e";
-    my $rc = eval $e;
-    trace "eval failed: $@" unless defined($rc);
-    return $rc;
 }
 
 sub _split {
