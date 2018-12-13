@@ -1,7 +1,14 @@
-I have way too many small shell functions and aliases and shell scripts.
+**You have reached the README for version 2 of active aliases**.  If you need
+the old one, checkout the tag "v1".  If you need help migrating some of your
+rules, please email me or open an issue and I will respond as soon as I can.
 
-Plus, in many of them, option/argument validation and processing is a pain,
-taking up far more code than the real action.
+----
+
+**Problem 1**: I have way too many small shell functions and aliases and shell
+scripts.
+
+**Problem 2**: in many of them, option/argument validation and processing is a
+pain, taking up far more code than the real action.
 
 # teaser examples
 
@@ -84,7 +91,12 @@ does not conflict with an existing command, function, or alias.  For example
 A rule consists of a **pattern**, followed by **one or more replacements** to
 be applied if the command matches the pattern.
 
-The pattern starts at column 1, the replacements at column 5.
+The pattern starts at column 1, the replacements at column 5 on the next line.
+(*As a sort of visual syntactic sugar, if you have only one replacement, you
+can have both the pattern and the replacement on the same line, separated by a
+**hard tab**.  Look at `examples/sf`; to my mind it definitely looks better
+than the standard syntax, because most of the rules in `sf` have only one
+replacement*).
 
 Here's a quick one: show N most recent git commits, defaulting to 9
 
@@ -437,7 +449,7 @@ example, I found a program called "ab", and was curious what it was:
     $ qf ab
     httpd-tools-2.4.34-3.fc28.x86_64
 
-Here's the aa code:
+Here's the *aa* code:
 
     qf (.*)/(.*)
         rpm -qf %1/%2
@@ -468,7 +480,7 @@ So, here's a simple egrep wrapper that captures my simple needs.
     ew
         grep -E -D skip --exclude-dir=.git --color=auto -I
 
-The first 4 lines show a common idiom in aa: jumping over some code based on
+The first 4 lines show a common idiom in *aa*: jumping over some code based on
 some condition.  Here, if the first arguments contains at least one uppercase
 letter, we replace the `ew` command with `_ew`.  This means the *second*
 pattern and its replacement command don't match, and so are skipped.
