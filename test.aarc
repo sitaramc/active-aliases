@@ -99,7 +99,7 @@ _t8_do1 %
 # ---- shell
 #> t9 .bashrc
 ## /home/sitaram
-## $HOMEE
+## 
 ## /home/sitaram/.bashrc
 t9 %
     pl $ENV{FOO} = "%1"

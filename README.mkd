@@ -192,8 +192,8 @@ Other examples of needing `sh` (in this case due to pipes and backticks):
         # show all man pages within an installed RPM package
         sh man `rpm -qd %1 | grep man.man`
 
-**IMPORTANT NOTE**: For convenience, *aa* expands environment variables that
-exist, `~` if it appears at the start of a word, and `$$` (the current
+**IMPORTANT NOTE**: For convenience, *aa* expands environment variables,
+`~` if it appears at the start of a word, and `$$` (the current
 process's pid); you only need the `sh` prefix if you're using shell features
 other than these.
 
@@ -255,7 +255,9 @@ make the replacement command be another rule:
         ...
         ...
 
-# special commands: cd, die, exec, exit
+# special commands
+
+## die, exit, exec, cd
 
 Sometimes it's easier to use the special `die` command:
 
@@ -268,13 +270,10 @@ Sometimes it's easier to use the special `die` command:
 message.  As a result, you don't need `||` to shield the `thunderbird` command
 that follows.
 
-`cd` is another special command.  It is handled internally because it's an
-important shell builtin and does not make sense to run as an external command.
-
 `exit` is similar to die, but requires a numeric argument, which becomes the
 exit code for the program.
 
-And finally, `exec` is also allowed.  You don't often need it, but it comes in
+`exec` is an interesting command.  You don't often need it, but it comes in
 handy with loops in *aa*.  Here's an example:
 
     avinfo % %%
@@ -287,6 +286,33 @@ handy with loops in *aa*.  Here's an example:
 The crux of the looping is the `exec %aa`.  It's pretty similar to "tail
 recursion" in concept.  (The `%aa` is a special variable that gets replaced by
 the path to the *aa* program).
+
+`cd` is another special command.  It is handled internally because it's an
+important shell builtin and does not make sense to run as an external command.
+
+## `export` and environment variables
+
+`export` is essentially the same as in shell, except that here it's a command,
+so you need to use it even when you're re-assigning a value to an existing
+environment variable.  The syntax is `export VAR=value` (leave out the `value`
+to unset a variable).
+
+For example, I have a bunch of things in `~/.local/bin` which I don't want in
+the default path, but would like to invoke them conveniently when I need to.
+With this:
+
+    Local %%
+        export PATH=$HOME/.local/bin:$PATH
+        %1
+
+I can simply type `Local mkdocs`, and `~/.local/bin/mkdocs` will run.
+
+To test for an env var, just use the test builtin
+
+    needtmux %%
+        ? test -n $TMUX
+        && %1
+        || die you are not in a tmux session
 
 # using captured output in a replacement command
 

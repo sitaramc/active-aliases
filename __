@@ -191,8 +191,8 @@ sub shemulate {
     map { s(\$\$)($$)g } @a;
     map { s(^~$)($ENV{HOME}) } @a;
     map { s(^~/)($ENV{HOME}/) } @a;
-    map { s(\$(\w+))($ENV{$1} || '$' . $1)ge } @a;
-    map { s(\$\{(\w+)\})($ENV{$1} || '${' . $1 . '}')ge } @a;
+    map { s(\$(\w+))($ENV{$1} || '')ge } @a;
+    map { s(\$\{(\w+)\})($ENV{$1} || '')ge } @a;
 
     # portability: replace "%aa" by $ENV{AA_BIN}
     map { s(%aa)($ENV{AA_BIN}) } @a;
@@ -364,7 +364,7 @@ sub _split {
     # we ignore $_[0], which is a space
 
     # TBD handle && and || prefixes here also
-    if ($s =~ /^([!?] +)?(\+ +)?(sh|pl|die|cd) /) {
+    if ($s =~ /^([!?] +)?(\+ +)?(sh|pl|die|cd|export) /) {
         # return normal split for cases where the eventual result will be
         # "join"-ed again before being executed in some form.
         return split(' ', $s);
@@ -487,6 +487,16 @@ sub _system {
         $rc = chdir(shift() || $ENV{HOME});
         trace "chdir failed: $!" unless $rc;
         $last_ec = ($rc ? 0 : 1); # $exit_code is perl truth, not shell truth
+
+    } elsif ($_[0] eq 'export') {
+        shift;
+        die "export: invalid format: ", Dumper \@_ unless join(" ", @_) =~ /^(\w+)=(.*)/;
+        # at present, this does not set $rc and $last_ec
+        if ($2) {
+            $ENV{$1} = $2;
+        } else {
+            delete $ENV{$1};
+        }
 
     } elsif ($_[0] eq 'pl') {
         shift;
