@@ -1,6 +1,6 @@
 I have way too many small shell functions and aliases and shell scripts.
 
-Plus, in most of them, option/argument validation and processing is a pain,
+Plus, in many of them, option/argument validation and processing is a pain,
 taking up far more code than the real action.
 
 # teaser examples
@@ -26,7 +26,7 @@ taking up far more code than the real action.
         mg
             grep -i
 
-    Now `... | mg foo bar -baz' will do what I described above.
+    Now `... | mg foo bar -baz` will do what I described above.
 
     If anyone can find a shell script that does this as intuitively/cleanly,
     I'd like to hear about it.
@@ -39,8 +39,8 @@ you ever maintained a sendmail address rewriting ruleset?
 Anyway, "active aliases" is a somewhat pretentious name I cooked up for a tool
 that helps me with the problems I listed at the top.
 
-For historical reasons the actual program is called `__`, but you can call it
-whatever you want!
+For historical reasons the actual program is called `__`, but you can rename
+it to whatever you want!
 
 **IMPORTANT NOTE**: If you've used the previous version of active aliases, there
 are several syntactic differences, but **the biggest difference, by far, is
@@ -110,9 +110,10 @@ references to them.
 
 Each `%` matches one word in the command, but sometimes you need to match an
 unknown number of words.  Here's an example that captures some frequently used
-`find` options and makes them easier to type:
+`find` options and makes them easier to type, and also shows the **important
+concept of "the tail"**:
 
-    # run `sf . -type f -s +50M -print` (for example)
+    # comments below refer to running: sf . -type f -s +50M -print
 
     # %% means "match ONE OR MORE words"
     # however, this pattern does not match our command; move on to the next one
@@ -165,7 +166,7 @@ But sometimes this is a problem:
 
     vpl
         vim *.pl
-        # WRONG!  runs vim with one argument: "*.pl", because there's no
+        # WRONG!  Runs vim with one argument: "*.pl", because there's no
         # actual shell to do the globbing/filename expansion
 
 To make it go via the shell, prefix an `sh`:
@@ -198,24 +199,22 @@ package, by running three different commands in sequence:
 
 # conditionals
 
-The `sh` prefix only applies to one command, which can only span one line.
-You can use backslash-escaped continuation lines, just like in shell, but that
-is cumbersome and ugly if overused.
-
-*aa* can do conditionals.  Here's a simple example:
+*aa* can do a limited form of conditionals.  Here's a typical example:
 
     tb
         ? pgrep -x thunderbird
         && echo thunderbird is already running
         || thunderbird
 
-Commands prefixed by `&&` run only if the exit code of the last command
-prefixed by `?` was zero (and similarly for `||` and non-zero).
+**The sequence is important**: a `?` followed by a `&&`, then an optional
+`||`.  The command prefixed by `?` is an external command; the other two are
+simply replacement commands.
 
-**IMPORTANT NOTE**: If you're used to shells chained `&&` and `||`, there is a
-significant difference, because in shell, it is the last command that ran
-whose exit code is used.  In *aa*, it is the last command that ran **which was
-prefixed by `?`**.
+**Behaviour is undefined if you do not use this sequence.  There is no
+checking!**
+
+Only one of the two replacement commands will be executed.  Think of this
+loosely like a simple if/then/else.
 
 The `?` can be combined with `sh` also:
 
@@ -225,6 +224,24 @@ The `?` can be combined with `sh` also:
         && ...full backup...
         # we're on a slower connection
         || ...backup only some directories...
+
+If you need either the "then" or "else" parts to have more than one command,
+make the replacement command be another rule:
+
+    backup
+        ? sh ip ro | grep default.via.172.25
+        && _full_backup
+        || _partial_backup
+
+    _full_backup
+        ...
+        ...
+        ...
+
+    _partial_backup
+        ...
+        ...
+        ...
 
 # special commands: cd, die, exec, exit
 
@@ -304,15 +321,15 @@ within the current directory which match a given pattern:
         ! sh find . -name .git -prune -o -type f -print | grep -i %1
         vim %!
 
-**NOTE**: when the `!` command returns multiple lines, each *line* becomes a
-separate argument, and `%!` interpolates them properly (i.e., as *separate*
-arguments).  In the example above, if there were files whose names contained
-spaces or other shell metas, it would still work fine.
+**IMPORTANT NOTE**: when the `!` command returns multiple lines, each *line*
+becomes a separate argument, and `%!` interpolates them properly (i.e., as
+*separate* arguments).  In the example above, if there were files whose names
+contained spaces or other shell metas, it would still work fine.
 
 # other features
 
-The rest of this document is a brief listing of less often used features; ask
-if you would like any of them expanded upon.
+This section covers some less often used features, and maybe some tips and
+tricks, idioms, etc.  I'll keep adding to this as I find suitable examples.
 
 ## `$` in a pattern
 
@@ -323,8 +340,8 @@ Look at this example again:
     glg
         git log --oneline -9
 
-The git log command is repeated, which is not ideal (if it changes, you have
-to change it in two places).
+The git log command is repeated, which is not ideal; if its options change,
+you have to change them in two places).
 
 This is much better:
 
@@ -338,7 +355,7 @@ The `$` says "no more arguments", so it matches exactly `glg`.
 ## error handling
 
 What if the user types in `glg foo`?  You get `fatal: unrecognized argument:
--foo`, which is not very informative, mainly because you made *git* detect the
+-foo`, which is not very informative, mainly because you made *git* report an
 error which your alias should have caught!
 
 Now try this:
@@ -365,21 +382,23 @@ done quickly.
 
 You've seen the tail already in the `sf` (`find` command) example earlier.
 
-By default, the tail arguments are placed at the end.  But:
+By default, the tail arguments are placed at the end, but that can be
+overridden:
 
     save
         # explicitly place the tail arguments using %@
         cp %@ ~/.save
         du -sm ~/.save
 
-**The tail gets added to EVERY replacement command**:
+**The tail gets added to EVERY replacement command**, which can cause...
+surprises:
 
     save
         cp %@ ~/.save
         du -sm ~/.save
         # tail arguments implicitly added to the "du" command also
 
-If you don't want that:
+You can prevent that:
 
     save
         cp %@ ~/.save
@@ -402,7 +421,7 @@ is, there may not be even one, so you can't use `%%` (remember, `%%` means
 
 # more examples
 
-I'll probably keep adding to this section as and when something comes up.
+This section is for real examples that I use.
 
 ----
 
@@ -483,7 +502,6 @@ script.  See `examples/sf` for a good example.
 <!--
 
 DECIDE:
--   should __END__ end the rules?
 -   do we need grab()
 
 DOC: 'x' are done, '-' are not done:
