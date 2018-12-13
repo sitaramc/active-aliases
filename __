@@ -211,9 +211,15 @@ sub interpolate {
     #     return join(" ", @cmd);
     # }
 
-    if ($cmd->[0] eq 'pl' or
-        $cmd->[1] eq 'pl' and ( $cmd->[0] eq '!' or $cmd->[0] eq '?' ) ) {
-        push @$cmd, '%.';
+    # force a "%." on perl code, unless it has "%@" somewhere.  The idea is
+    # that, unlike for normal commands and shell code, attaching the tail at
+    # the end is NOT the default, because it almost never makes sense --
+    # syntactically at least, if not semantically.
+    if (              $cmd->[0] eq 'pl' or
+        @$cmd > 1 and $cmd->[1] eq 'pl' and ( $cmd->[0] eq '!' or
+                                              $cmd->[0] eq '?'
+                                            ) ) {
+        push @$cmd, '%.' unless join(" ",@$cmd) =~ /%@/;
     }
     # a %. at the end says "don't attach the tail to me please!"
     if ($cmd->[-1] eq '%.') {
