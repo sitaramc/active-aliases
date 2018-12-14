@@ -428,8 +428,8 @@ overridden:
         cp %@ ~/.save
         du -sm ~/.save
 
-**The tail gets added to EVERY replacement command**, which can cause...
-surprises:
+**The tail gets added to EVERY replacement command** except `cd`, `exit`, and
+`export`.  This can cause...  surprises!
 
     save
         cp %@ ~/.save

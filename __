@@ -204,23 +204,12 @@ sub shemulate {
 # some calls do not supply a tail at all, so you need to check for that too
 sub interpolate {
     my ($cmd, $groups, $tail) = @_;
-
     # # allow passing in a string to be interpolated, as opposed to an array
     # if (not ref($cmd)) {
     #     my @cmd = interpolate([ split(' ', $cmd) ], $groups, $tail);
     #     return join(" ", @cmd);
     # }
 
-    # force a "%." on perl code, unless it has "%@" somewhere.  The idea is
-    # that, unlike for normal commands and shell code, attaching the tail at
-    # the end is NOT the default, because it almost never makes sense --
-    # syntactically at least, if not semantically.
-    if (              $cmd->[0] eq 'pl' or
-        @$cmd > 1 and $cmd->[1] eq 'pl' and ( $cmd->[0] eq '!' or
-                                              $cmd->[0] eq '?'
-                                            ) ) {
-        push @$cmd, '%.' unless join(" ",@$cmd) =~ /%@/;
-    }
     # a %. at the end says "don't attach the tail to me please!"
     if ($cmd->[-1] eq '%.') {
         pop @$cmd;
@@ -249,10 +238,26 @@ sub interpolate {
         }
     }
 
-    # otherwise, by default, attach the tail (if it exists) at the end
-    push @ret, @$tail if $tail and ref($tail);
+    # otherwise, by default, attach the tail (if it exists) at the end, for
+    # tail-eligible commands
+    push @ret, @$tail if $tail and ref($tail) and tail_eligible(@$cmd);
 
     return @ret;
+}
+
+sub tail_eligible {
+    shift    if $_[0] eq '!' or
+                $_[0] eq '?';
+
+    shift    if $_[0] eq '+';
+
+    return 0 if $_[0] eq 'pl' or
+                $_[0] eq 'cd' or
+                $_[0] eq 'exit' or
+                $_[0] eq 'export';
+
+    return 1;
+    # which means 'sh', 'die', 'exec', or normal command
 }
 
 sub deref {
