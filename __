@@ -191,8 +191,8 @@ sub shemulate {
     map { s(\$\$)($$)g } @a;
     map { s(^~$)($ENV{HOME}) } @a;
     map { s(^~/)($ENV{HOME}/) } @a;
-    map { s(\$(\w+))($ENV{$1} || '')ge } @a;
-    map { s(\$\{(\w+)\})($ENV{$1} || '')ge } @a;
+    map { s(\$(\w+))($ENV{$1} || '$'.$1)ge } @a;
+    map { s(\$\{(\w+)\})($ENV{$1} || '$'.$1)ge } @a;
 
     # portability: replace "%aa" by $ENV{AA_BIN}
     map { s(%aa)($ENV{AA_BIN}) } @a;
