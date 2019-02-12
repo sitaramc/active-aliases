@@ -61,11 +61,12 @@ redirection, etc.
 "aa" takes a set of rules and a command.  The rules are picked up from:
 
 1.  filename given in env var `AA_RC`, if it is set (see the section on
-    embedding *aa* for more on this).
-2.  `~/.aarc`, if it exists
-3.  `~/.config/aarc`, if it exists.  Note this is `aarc`, not `.aarc`.
+    embedding *aa* for more on this),
+2.  `$PWD/.aarc`, if it exists, and `$PWD` is a subdirectory of `$HOME`,
+3.  `~/.aarc`, if it exists,
+4.  and finally, `~/.config/aarc`, if it exists.  Note this is `aarc`, not `.aarc`.
 
-# command
+# running a command
 
 "aa" can be invoked like `__ alias args`; for example:
 
@@ -140,13 +141,18 @@ concept of "the tail"**:
     # left over after the match ("+50M -print") become what is called the
     # "tail", and are implicitly added to the replacement
     sf %% -s
-        # the %1 is replaced by ". type f", and the -s becomes -size
+        # the %1 is replaced by ". -type f", and the -s becomes -size
         sf %1 -size
+        # so the current command is now:
+        #   sf . -type f -size +50M -print
 
     # final rule: change the actual command to find and run it.  Notice how in
     # this case pretty much the whole command is the "tail"
     sf
         find
+
+(Note: see examples/sf for a much more comprehensive example; that's a command
+I use every day, but I've annotated it for easy understanding.)
 
 You can use your own regexes if you need to; here's one which extracts *part
 of* a URL:
@@ -307,9 +313,9 @@ With this:
 
 I can simply type `Local mkdocs`, and `~/.local/bin/mkdocs` will run.
 
-To test for an env var, just use the test builtin
+To test for an env var, just use the test command:
 
-    needtmux %%
+    in_tmux %%
         ? test -n $TMUX
         && %1
         || die you are not in a tmux session
@@ -331,8 +337,8 @@ You can that in *aa* also:
 But we'd like to avoid the shell as much as possible.  So we do this:
 
     vw %
-    ! which %1
-    vim %!
+        ! which %1
+        vim %!
 
 The `!` tells *aa* to run the command after it immediately, and capture its
 output.  In subsequent **replacement** commands, this is available as the
