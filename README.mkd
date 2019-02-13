@@ -434,8 +434,8 @@ overridden:
         cp %@ ~/.save
         du -sm ~/.save
 
-**The tail gets added to EVERY replacement command** except `cd`, `exit`, and
-`export`.  This can cause...  surprises!
+**The tail gets added to EVERY replacement command** except `cd`, `exit`,
+`export`, and `skip`.  This can cause...  surprises!
 
     save
         cp %@ ~/.save
@@ -569,6 +569,7 @@ x   multiple commands
 -   +
 -   D=1
 x   cd, die, exit
+-   skip (note to myself: it is about not having to repeat the incoming command in the && branch)
 
 -   embedded aa, AA_RC, "#!__"
 

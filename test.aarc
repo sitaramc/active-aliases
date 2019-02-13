@@ -642,6 +642,7 @@ t26_1q
 #> t26_0q
 #> t26_1q
 ## hi
+
 t27
     sh false
     && echo hi
@@ -654,3 +655,20 @@ t28
     || echo there
 #> t28
 ## there
+
+t29 %
+    ? pl %1
+    && skip
+    || t29f
+t29 %
+    echo got t29 %1
+t29f
+    echo got t29f
+#> t29 1
+## got t29 1
+#> t29 1 b c
+## got t29 1 b c
+#> t29 0
+## got t29f
+#> t29 0 b c
+## got t29f b c

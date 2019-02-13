@@ -124,6 +124,15 @@ sub dequeue {
                     # immediate execution; capture results (newline-separated)
                     $groups[0] = _capture(@newcmd);
                 } else {
+                    # treat the 'skip' command specially, but only if it is
+                    # preceded by '||' or '&&'.  In that case, it acts as a
+                    # convenient shortcut for repeating the current command.
+                    if ( @newcmd == 2 and
+                        ($newcmd[0] eq '||' or $newcmd[0] eq '&&') and
+                         $newcmd[1] eq 'skip' ) {
+                        pop @newcmd;
+                        push @newcmd, @cmd;
+                    }
                     # "processed by the rest of the rc lines" actually means
                     # we add to the queue; see comments on 'queue' at the top.
                     push @subqueue, [ @newcmd ];
@@ -251,9 +260,13 @@ sub tail_eligible {
 
     shift    if $_[0] eq '+';
 
+    shift    if $_[0] eq '||' or
+                $_[0] eq '&&';
+
     return 0 if $_[0] eq 'pl' or
                 $_[0] eq 'cd' or
                 $_[0] eq 'exit' or
+                $_[0] eq 'skip' or
                 $_[0] eq 'export';
 
     return 1;
