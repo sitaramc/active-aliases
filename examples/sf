@@ -35,10 +35,13 @@ exec ~/bin/__ sf "$@"
 # criteria.  There's enough variety there that I cannot simply use a couple of
 # quick aliases.
 
-#   -   let's get this out of the way: fd doesn't have all the options I need.
-#       (I do have it installed, and in fact my FZF_DEFAULT_COMMAND is "fd -HI
-#       -E .git -t f", but fd doesn't have -size, -mtime, etc., and I often
-#       need those)
+#   -   let's get this out of the way: I do have `fd` installed, and in fact
+#       my FZF_DEFAULT_COMMAND is "fd -HI -E .git -t f", and it now has
+#       *almost* all the options I need (lacking only 'ctime').  However, I
+#       still use this script on machines where I don't have fd installed.
+#       TBD is a modification so that this script supports `fd` syntax,
+#       automatically falling back to `find` if `fd` doesn't exist on a
+#       certain system.
 
 #   -   I generally search in $PWD, but if I'm searching elsewhere, it's
 #       exactly *one* directory, never more
