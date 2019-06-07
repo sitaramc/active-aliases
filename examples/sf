@@ -15,9 +15,9 @@ exec ~/bin/__ sf "$@"
     respectively, -d (maxdepth), -m/c (mmin/cmin), -s (size).  The
     last 4 options must be followed by an appropriate argument.  The
     argument to -m and -c can be suffixed with 'd' to use mtime/ctime
-    instead of mmin/cmin.  The special options -M and -C take a
-    number, and behave like 'ls -tr' and 'ls -trc' respectively, with
-    a 'tail N' suffixed."
+    instead of mmin/cmin.  The special options -M, -C, and -S take a
+    number, and show you the last N files by modification time, inode change
+    time, or size."
     exit 1;
 }
 
@@ -132,10 +132,9 @@ sf %	sf %1 -type d -name .git -prune -o
 # maxdepth must come right after the directory name, even if the command had it elsewhere
 sf % %% -maxdepth %	sf %1 -maxdepth %3 %2
 
-# this is a nice twist: if -M or -C were given, divert to a command which
-# prints the last N files, ordered by mtime or ctime, respectively, *with* the
-# appropriate timestamps printed on the left (actually, that's how we sort!)
-sf %% (-[MC])	_ssf %1 %2
+# this is a nice twist: if -M, -C, or -S were given, divert to a command which
+# prints the last N files, ordered by mtime, ctime, or size, respectively
+sf %% (-[MCS])	_ssf %1 %2
 
 # in the normal "find" command, add a "-print" at the end.  (This is needed
 # because of how "find" processes the arguments when you have a "-prune"
@@ -149,8 +148,8 @@ sf	+ find
 
 # this is the special "print sorted list with timestamps" bit
 
-# move the -C N or -M N to the end of the argument list
-_ssf %% (-[CM]) % %%	_ssf %1 %4 %2 %3
+# move the -C N (or -M or -S) to the end of the argument list
+_ssf %% (-[CMS]) % %%	_ssf %1 %4 %2 %3
 # add quotes around the name glob or regex, since we will be running with
 # 'sh'.  XXX The way this is done needs to be documented; basically,
 # shellwords() removes the outermost quotes so you need two!
@@ -163,6 +162,7 @@ _ssf %% -iregex %	_ssf %1 -iregex "'%2'"
 # "arg2", ...), where the shell is not involved
 _ssf %% -M (\d+)	+ sh find %1 -printf '%T+ %M %''10s %p\n' | sort | tail -%2
 _ssf %% -C (\d+)	+ sh find %1 -printf '%C+ %M %''10s %p\n' | sort | tail -%2
+_ssf %% -S (\d+)	+ sh find %1 -printf '%''10s %M %p\n' | sort -n | tail -%2
 # note how we specify "%10s" as the format specifier for the size.  Because
 # %(\d+) is special to active aliases, and because we're anyway going to
 # process this in shell, we separate out the % and the 10s by putting them in
