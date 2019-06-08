@@ -313,12 +313,14 @@ With this:
 
 I can simply type `Local mkdocs`, and `~/.local/bin/mkdocs` will run.
 
-To test for an env var, just use the test command:
+To test for an env var, it's simplest to drop down to perl:
 
     in_tmux %%
-        ? test -n $TMUX
+        ? pl $ENV{TMUX}
         && %1
         || die you are not in a tmux session
+
+`? sh test -n "$TMUX"` also works, but is less efficient.
 
 # using captured output in a replacement command
 
