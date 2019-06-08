@@ -4,73 +4,38 @@
 #   WARNINGS: HARD TABS within; best viewed with a tabstop of "24".  If your
 #   editor is vim/compatible, you'll see it like that.
 
+[ -z "$1" ] && {
+    cat <<EOF
+
+sf extends the 'fd' command in the following ways:
+
+*   prepends '-HI -L -E .git -E .cache'; looking for files is no time to be
+    shy and hold back ;-)
+
+*   -f, -d, -l are short for -t f, -t d, -t l
+    *   but if -d is followed by a number, it's maxdepth!
+    *   we don't have shortcuts for -t x and -t e
+
+*   -s is short for -S
+    *   (I don't think I will ever need case-sensitive matches so no loss)
+    *   if the number is not followed by a suffix, add 'b'
+    *   'fd' does not seem to allow exact size, it requires a + or a -.  So
+        convert "-s 100" to "-S +100b -S -100b".
+
+*   -m is short for --changed-within or --changed-before, depending on sign of argument
+    *   if the argument has no suffix, use "m" for min
+
+*   -S and -M have the same semantics as -s and -m, except they pipe to ls -al
+    with appropriate flags to sort on the corresponding field
+
+EOF
+    exit 1;
+}
+
 # tell bash to transfer control to aa, with this script ($0) as the rc file,
 # and "sf" being the initial command
 export AA_RC=$0
 exec ~/bin/__ sf "$@"
-
-[ -z "$1" ] && {
-    echo "sf [path] [pattern] [options]
-    options can be -r (use iregex instead of iname), -f/d/l (-type f/d/l
-    respectively, -d (maxdepth), -m/c (mmin/cmin), -s (size).  The
-    last 4 options must be followed by an appropriate argument.  The
-    argument to -m and -c can be suffixed with 'd' to use mtime/ctime
-    instead of mmin/cmin.  The special options -M, -C, and -S take a
-    number, and show you the last N files by modification time, inode change
-    time, or size."
-    exit 1;
-}
-
-# using active aliases in standalone scripts
-# ------------------------------------------
-
-# NOTE: this is a command I use every day, several times a day.  It is not a
-# toy example used for purely demonstration value.  But I have annotated it
-# sufficiently so it can also be used as a demo of active aliases.
-
-# My needs
-# --------
-
-# I use the `find` command several times a day, with many different search
-# criteria.  There's enough variety there that I cannot simply use a couple of
-# quick aliases.
-
-#   -   let's get this out of the way: I do have `fd` installed, and in fact
-#       my FZF_DEFAULT_COMMAND is "fd -HI -E .git -t f", and it now has
-#       *almost* all the options I need (lacking only 'ctime').  However, I
-#       still use this script on machines where I don't have fd installed.
-#       TBD is a modification so that this script supports `fd` syntax,
-#       automatically falling back to `find` if `fd` doesn't exist on a
-#       certain system.
-
-#   -   I generally search in $PWD, but if I'm searching elsewhere, it's
-#       exactly *one* directory, never more
-#   -   I *always* want to avoid ".git" and its subdirectories
-#   -   I generally want "-iname", not "-name"
-#   -   but sometimes I need "-iregex" (not just for the regex part, but
-#       because that matches on the *whole* path
-#   -   other options I use often: type, maxdepth, size, ctime/cmin, and
-#       mtime/mmin
-
-#   -   it bothers me that -size wants lowercase "k" for kB, but uppercase "M"
-#       and "G" for mB and gB; I'd like to use any case, since there is no
-#       conflict.  It also bothers me that the default, without a suffix, is a
-#       "block" -- something no *user* cares about these days; I want the
-#       default to be kB.
-
-#   -   I hate remembering to switch from -mmin to -mtime for longer
-#       durations; I'd like to just suffix "d" and have the command switch
-#       from mmin to mtime!  (Similarly for cmin/ctime)
-
-#   -   it also bothers me to remember that -maxdepth must come *before* any
-#       conditions; it would be nice if the alias would fix that for me
-
-#   -   and finally, like a true Unix-er, I want all these as single letter
-#       options ;-)
-
-#   -   oh and a bonus: I often want to see the last N most recent (by mtime
-#       or ctime) files listed out with their corresponding timestamps, in
-#       sorted order!
 
 exit $?
 
@@ -81,96 +46,29 @@ exit $?
 
 #!__
 
-# if the first word is not a directory, it is meant to be "."
-sf %
-    ? pl -d "%1"
-    && sf %1
-    || sf . %1
-    # notice you MUST supply both && and || clauses
+# overload "-d" to serve both as max-depth and "-t d"
+%% -d (\d+)	%1 --max-depth %2
+%% -(d|f|l)	%1 -t %2
 
-# on the next few rules, notice that we change the command from "sf" to "_sf".
-# This is a common idiom in aa, acting like an "if" statement to bypass a
-# rule.  Later there will be a rule that turns _sf back to sf, which
-# represents the "endif", if you will.
+# set up the -X command and the pipe for -S and -M
+%% -S
+    export _SF_PIPE=ls -aUld | sort -k5,5n
+    %1 -s
+%% -M
+    export _SF_PIPE=ls -aUld --time-style=full-iso | sort -k6,7
+    %1 -m
 
-# (IF) second word is an option, bypass next rule
-sf % -(.*)	_sf %1 -%2
-# (body of IF) now we know the second word is NOT an option, add "-n" to represent "-iname"
-sf % %	_sf %1 -n %2
-# (ENDIF) join back to the main flow
-_sf	sf
-# why do we have to do it like this?  Because "%" matches everything, even a
-# "-foo", so you have to catch the "-<something>" first, move it out of the
-# way, and then "%" will match "everything except words starting with a "-".
+# size options: handle exact size (default unit is bytes)
+%% -s (\d+)	%1 --size +%2b --size -%2b
+%% -s ([-+]\d+)	%1 --size %2b
+%% -s ([-+]\d+[bkmgt])	%1 --size %2
 
-# was there a "-r" somewhere among the options?  replace -n with -r (for "-iregex")
-sf %% -n %% -r	sf %1 -r %2
+# file mod time options: allow a more compact, find-like, syntax (default minutes)
+%% -m ([-+]\d+)	%1 -m %2m
+%% -m -(\d+.*)	%1 --changed-within %2
+%% -m +(\d+.*)	%1 --changed-before %2
 
-# now mangle all the options
-sf %% -n %	sf %1 -iname *%2*
-sf %% -r %	sf %1 -iregex .*%2.*
-sf %% -d (\d+)	sf %1 -maxdepth %2
-sf %% -(f|d|l)	sf %1 -type %2
-# -m or -c with an argument that ends with 'd', use mtime/ctime...
-sf %% -m (.\d+)d	sf %1 -mtime %2
-sf %% -c (.\d+)d	sf %1 -ctime %2
-# ... otherwise, use mmin/cmin
-sf %% -m (.\d+)	sf %1 -mmin %2
-sf %% -c (.\d+)	sf %1 -cmin %2
-# -s (size) ending with a digit default to "k"
-sf %% -s (.\d+)	sf %1 -size %2k
-# "find" is inconsistent with case of k/M/G; we accept both cases for all
-# three suffixes
-sf %% -s (.\d+)[kK]	sf %1 -size %2k
-sf %% -s (.\d+)[mM]	sf %1 -size %2M
-sf %% -s (.\d+)[gG]	sf %1 -size %2G
-
-# is there *still* a "-r" somewhere?  That's an error
-sf %% -r	die "-r" not allowed %.
-# the "die" commmand is a special command; it does not call out to shell, but
-# uses perl's own die function to print the supplied message
-
-# add the ".git" exclusion in the proper place
-sf %	sf %1 -type d -name .git -prune -o
-# maxdepth must come right after the directory name, even if the command had it elsewhere
-sf % %% -maxdepth %	sf %1 -maxdepth %3 %2
-
-# this is a nice twist: if -M, -C, or -S were given, divert to a command which
-# prints the last N files, ordered by mtime, ctime, or size, respectively
-sf %% (-[MCS])	_ssf %1 %2
-
-# in the normal "find" command, add a "-print" at the end.  (This is needed
-# because of how "find" processes the arguments when you have a "-prune"
-# earlier!
-sf %%	sf %1 -print
-# finally, run the actual find command.  The "+" at the start says "print the
-# command as it is executed"
-sf	+ find
-
-# ----------------------------------------------------------------------
-
-# this is the special "print sorted list with timestamps" bit
-
-# move the -C N (or -M or -S) to the end of the argument list
-_ssf %% (-[CMS]) % %%	_ssf %1 %4 %2 %3
-# add quotes around the name glob or regex, since we will be running with
-# 'sh'.  XXX The way this is done needs to be documented; basically,
-# shellwords() removes the outermost quotes so you need two!
-_ssf %% -iname %	_ssf %1 -iname "'%2'"
-_ssf %% -iregex %	_ssf %1 -iregex "'%2'"
-
-# compose the final command and run it with 'sh'.  This is a special mode
-# where aa runs system("long string that will almost certainly invoke your
-# default shell to run"), rather than the usual system("command", "arg1",
-# "arg2", ...), where the shell is not involved
-_ssf %% -M (\d+)	+ sh find %1 -printf '%T+ %M %''10s %p\n' | sort | tail -%2
-_ssf %% -C (\d+)	+ sh find %1 -printf '%C+ %M %''10s %p\n' | sort | tail -%2
-_ssf %% -S (\d+)	+ sh find %1 -printf '%''10s %M %p\n' | sort -n | tail -%2
-# note how we specify "%10s" as the format specifier for the size.  Because
-# %(\d+) is special to active aliases, and because we're anyway going to
-# process this in shell, we separate out the % and the 10s by putting them in
-# two different, but directly adjacent, strings.
-
-# "find" hint: use "%TF %TT %p\n" if you want date and time as separate fields
-
-# and... that's it!
+sf %%
+    ? pl $ENV{_SF_PIPE}
+    && sh fd -HI -L -E .git -E .cache %1 -X $_SF_PIPE
+    ||    fd -HI -L -E .git -E .cache %1
