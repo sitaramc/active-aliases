@@ -1,8 +1,13 @@
 #!/bin/bash
 
 # vim: ts=24:
-#   WARNINGS: HARD TABS within; best viewed with a tabstop of "24".  If your
-#   editor is vim/compatible, you'll see it like that.
+#   "aa" actually allows simple rules to be on one line, with a hard tab in
+#   between.  A lot of the rules in this file *are* such rules, and it is
+#   aesthetically pleasing to have several of them on one line each, with
+#   tabstop set to something high, like 24.  However, when viewed as a github
+#   page, that does not work very well, so I have (somewhat reluctantly)
+#   replaced all the one-line rules with 2-line rules that do not use hard
+#   tabs, and thus display correctly in a github view.
 
 [ -z "$1" ] && {
     cat <<EOF
@@ -51,28 +56,38 @@ exit $?
 #!__
 
 # overload "-d" to serve both as max-depth and "-t d"
-%% -d (\d+)	%1 --max-depth %2
-%% -(d|f|l)	%1 -t %2
+%% -d (\d+)
+    %1 --max-depth %2
+%% -(d|f|l)
+    %1 -t %2
 
 # set up the -X command and the pipe for -S and -M
-%% -S $	%1 -S -99t
+%% -S $
+    %1 -S -99t
 %% -S
     export _SF_PIPE=ls -aUld | sort -k5,5n
     %1 -s
-%% -M $	%1 -M -99y
+%% -M $
+    %1 -M -99y
 %% -M
     export _SF_PIPE=ls -aUld --time-style=full-iso | sort -k6,7
     %1 -m
 
 # size options: handle exact size (default unit is bytes)
-%% -s (\d+)	%1 --size +%2b --size -%2b
-%% -s ([-+]\d+)	%1 --size %2b
-%% -s ([-+]\d+[bkmgt])	%1 --size %2
+%% -s (\d+)
+    %1 --size +%2b --size -%2b
+%% -s ([-+]\d+)
+    %1 --size %2b
+%% -s ([-+]\d+[bkmgt])
+    %1 --size %2
 
 # file mod time options: allow a more compact, find-like, syntax (default minutes)
-%% -m ([-+]\d+)	%1 -m %2m
-%% -m -(\d+.*)	%1 --changed-within %2
-%% -m +(\d+.*)	%1 --changed-before %2
+%% -m ([-+]\d+)
+    %1 -m %2m
+%% -m -(\d+.*)
+    %1 --changed-within %2
+%% -m +(\d+.*)
+    %1 --changed-before %2
 
 sf %%
     ? pl $ENV{_SF_PIPE}
