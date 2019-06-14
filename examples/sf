@@ -12,21 +12,25 @@ sf extends the 'fd' command in the following ways:
 *   prepends '-HI -L -E .git -E .cache'; looking for files is no time to be
     shy and hold back ;-)
 
-*   -f, -d, -l are short for -t f, -t d, -t l
-    *   but if -d is followed by a number, it's maxdepth!
+*   -f, -d, -l change to -type f, -type d, -type l
+    *   but if -d is followed by a number, it becomes --max-depth!
     *   we don't have shortcuts for -t x and -t e
 
-*   -s is short for -S
-    *   (I don't think I will ever need case-sensitive matches so no loss)
+*   -s changes to --size (default suffix: b)
+    *   I don't think I will ever need case-sensitive matches so no loss
     *   if the number is not followed by a suffix, add 'b'
     *   'fd' does not seem to allow exact size, it requires a + or a -.  So
-        convert "-s 100" to "-S +100b -S -100b".
+        "-s 100" converts to "-S +100b -S -100b".
 
-*   -m is short for --changed-within or --changed-before, depending on sign of argument
-    *   if the argument has no suffix, use "m" for min
+*   -m changes to --changed-within or --changed-before, depending on sign of argument
+    *   if the argument has no suffix, use "m" for minutes
 
 *   -S and -M have the same semantics as -s and -m, except they pipe to ls -al
-    with appropriate flags to sort on the corresponding field
+    and sort on the corresponding field.
+
+    In addition, if they are the last option and you don't supply a size or
+    time spec, they use a default of 99 terabytes or 99 years, effectively
+    making them a "show me ALL files but sorted on size/time".
 
 EOF
     exit 1;
@@ -51,9 +55,11 @@ exit $?
 %% -(d|f|l)	%1 -t %2
 
 # set up the -X command and the pipe for -S and -M
+%% -S $	%1 -S -99t
 %% -S
     export _SF_PIPE=ls -aUld | sort -k5,5n
     %1 -s
+%% -M $	%1 -M -99y
 %% -M
     export _SF_PIPE=ls -aUld --time-style=full-iso | sort -k6,7
     %1 -m
