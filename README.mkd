@@ -10,6 +10,34 @@ scripts.
 **Problem 2**: in many of them, option/argument validation and processing is a
 pain, taking up far more code than the real action.
 
+----
+
+<!--ts-->
+   * [teaser examples](#teaser-examples)
+   * [active aliases](#active-aliases)
+   * [rule files](#rule-files)
+   * [running a command](#running-a-command)
+   * [rules: patterns, replacements, and matching](#rules-patterns-replacements-and-matching)
+   * [execution](#execution)
+   * [multiple replacement commands](#multiple-replacement-commands)
+   * [conditionals](#conditionals)
+   * [special commands](#special-commands)
+      * [die, exit, exec, cd](#die-exit-exec-cd)
+      * [export and environment variables](#export-and-environment-variables)
+   * [using captured output in a replacement command](#using-captured-output-in-a-replacement-command)
+   * [other features](#other-features)
+      * [$ in a pattern](#-in-a-pattern)
+      * [error handling](#error-handling)
+      * [tail, \x@, and \x.](#tail--and-)
+   * [more examples](#more-examples)
+   * [appendix 1: embedding <em>aa</em> rules in a normal script](#appendix-1-embedding-aa-rules-in-a-normal-script)
+
+<!-- Added by: sitaram, at: Tue 13 Aug 2019 11:49:17 AM IST -->
+
+<!--te-->
+
+----
+
 # teaser examples
 
 1.  I want an alias `wg` that force-converts http to https then calls wget:
