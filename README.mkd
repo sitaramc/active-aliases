@@ -1,3 +1,9 @@
+**2025-10-10: this repo is now archived**.  After a couple of years it will be deleted.
+
+Eventually I intend to keep only gitolite, gitolite-doc, and perhaps a few other repos.  Almost everything else I have is essentially background noise :-)
+
+----
+
 **You have reached the README for version 2 of active aliases**.  If you need
 the old one, checkout the tag "v1".  If you need help migrating some of your
 rules, please email me or open an issue and I will respond as soon as I can.
